@@ -5,7 +5,7 @@ __pycache__/
 *.egg-info/
 .env
 ~/.mahoraga/
-models/*.pkl
+models/global_model.pkl
 *.log
 .DS_Store
 build/
