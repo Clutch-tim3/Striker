@@ -10,7 +10,7 @@ cd "$ROOT"
 pip3 install -q pyinstaller
 pip3 install -q -r python/requirements.txt
 
-pyinstaller \
+python3 -m PyInstaller \
   --onefile \
   --name mahoraga \
   --distpath "$DIST" \
@@ -21,7 +21,7 @@ pyinstaller \
   --hidden-import psutil \
   --hidden-import watchdog \
   --hidden-import faiss \
-  --add-data "models:models" \
+  --add-data "$ROOT/models:models" \
   python/main.py
 
 echo "✓ Python binary: $DIST/mahoraga"
