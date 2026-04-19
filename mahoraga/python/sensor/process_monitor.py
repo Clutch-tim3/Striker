@@ -51,12 +51,28 @@ LINUX_HIGH_RISK = {
 HIGH_RISK = WINDOWS_HIGH_RISK | MACOS_HIGH_RISK | LINUX_HIGH_RISK
 
 
+# Suspicious parent→child chains — any match is an immediate high-severity flag
+SUSPICIOUS_ANCESTRY = {
+    'winword.exe':    {'cmd.exe', 'powershell.exe', 'wscript.exe', 'cscript.exe', 'mshta.exe'},
+    'excel.exe':      {'cmd.exe', 'powershell.exe', 'wscript.exe'},
+    'outlook.exe':    {'cmd.exe', 'powershell.exe', 'wscript.exe', 'mshta.exe'},
+    'acrord32.exe':   {'cmd.exe', 'powershell.exe'},
+    'chrome.exe':     {'cmd.exe', 'powershell.exe'},
+    'firefox.exe':    {'cmd.exe', 'powershell.exe'},
+    'msedge.exe':     {'cmd.exe', 'powershell.exe'},
+    'google chrome':  {'osascript', 'bash', 'sh'},
+    'microsoft word': {'osascript', 'bash', 'sh'},
+    'cmd.exe':        {'mshta.exe', 'regsvr32.exe', 'rundll32.exe', 'cmstp.exe'},
+}
+
+
 class ProcessMonitor:
     def __init__(self, on_telemetry):
         self.on_telemetry = on_telemetry
         self.running = False
         self.known_pids = set()
         self._suspicious_counts = {}   # pid -> spike_count (avoid spam)
+        self._pid_names = {}           # pid -> name for ancestry lookups
 
     def start(self):
         self.running = True
@@ -86,6 +102,7 @@ class ProcessMonitor:
                         # ── New process appeared ────────────────────────────
                         if pid not in self.known_pids:
                             self.known_pids.add(pid)
+                            self._pid_names[pid] = name
                             self.on_telemetry({
                                 'source':   'process',
                                 'event':    'new_process',
@@ -100,6 +117,24 @@ class ProcessMonitor:
                                 'connections': 0,
                                 'platform': OS,
                             })
+
+                            # ── Ancestry chain check ─────────────────────────
+                            ppid = info.get('ppid')
+                            parent_name = self._pid_names.get(ppid, '')
+                            suspicious_children = SUSPICIOUS_ANCESTRY.get(parent_name, set())
+                            if name in suspicious_children:
+                                self.on_telemetry({
+                                    'source':      'process',
+                                    'event':       'suspicious_ancestry',
+                                    'pid':         pid,
+                                    'name':        info.get('name'),
+                                    'ppid':        ppid,
+                                    'parent_name': parent_name,
+                                    'cmdline':     cmdline,
+                                    'attack_hint': 'backdoor',
+                                    'severity_hint': 9,
+                                    'platform':    OS,
+                                })
 
                         # ── Resource spike ───────────────────────────────────
                         cpu = info.get('cpu_percent', 0) or 0
@@ -140,11 +175,11 @@ class ProcessMonitor:
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         pass
 
-                self.known_pids -= (self.known_pids - current_pids)
-                # Clean up spike counts for dead processes
-                for pid in list(self._suspicious_counts):
-                    if pid not in current_pids:
-                        del self._suspicious_counts[pid]
+                dead_pids = self.known_pids - current_pids
+                self.known_pids -= dead_pids
+                for pid in dead_pids:
+                    self._suspicious_counts.pop(pid, None)
+                    self._pid_names.pop(pid, None)
 
             except Exception as e:
                 logger.error(f'Process monitor loop error: {e}')

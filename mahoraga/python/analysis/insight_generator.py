@@ -283,6 +283,8 @@ def generate(threat: dict, antibody: dict, response_taken: list) -> dict:
         'kernel_module_load', 'ld_preload_injection', 'reverse_shell', 'cron_modification',
         # Cross-platform
         'persistence_file_drop',
+        'high_entropy_write',
+        'suspicious_ancestry',
     }
     if telemetry.get('event') in HEURISTIC_EVENTS:
         detection_signals.append(

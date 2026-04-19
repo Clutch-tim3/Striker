@@ -1,5 +1,6 @@
 import os
 import time
+import math
 import platform
 import threading
 from python.core.logger import get_logger
@@ -64,6 +65,27 @@ def _get_watch_paths():
         ] if os.path.exists(p)]
 
 
+def _shannon_entropy(path, sample_bytes=65536):
+    """Return Shannon entropy (0–8) for the first sample_bytes of a file."""
+    try:
+        with open(path, 'rb') as f:
+            data = f.read(sample_bytes)
+        if not data:
+            return 0.0
+        freq = [0] * 256
+        for byte in data:
+            freq[byte] += 1
+        n = len(data)
+        entropy = 0.0
+        for c in freq:
+            if c:
+                p = c / n
+                entropy -= p * math.log2(p)
+        return entropy
+    except Exception:
+        return 0.0
+
+
 def _check_persistence_path(path):
     """Return an attack hint if the file path is a known persistence location."""
     pl = path.lower().replace('\\', '/')
@@ -103,6 +125,7 @@ class FileWatcher:
                         return
                     self._emit('file_modified', event.src_path)
                     self._ransomware_check(event.src_path)
+                    self._entropy_check(event.src_path)
 
                 def on_created(self, event):
                     if event.is_directory:
@@ -140,6 +163,20 @@ class FileWatcher:
                             'source': 'file', 'event': 'persistence_file_drop',
                             'file_path': path, 'attack_hint': hint,
                             'severity_hint': 8, 'platform': OS,
+                        })
+
+                def _entropy_check(self, path):
+                    ext = os.path.splitext(path)[1].lower()
+                    if ext not in SENSITIVE_EXTENSIONS:
+                        return
+                    entropy = _shannon_entropy(path)
+                    # Fully encrypted/compressed data has entropy > 7.2
+                    if entropy > 7.2:
+                        cb({
+                            'source': 'file', 'event': 'high_entropy_write',
+                            'file_path': path, 'entropy': round(entropy, 3),
+                            'attack_hint': 'ransomware', 'severity_hint': 8,
+                            'platform': OS,
                         })
 
                 def _ransomware_check(self, path):

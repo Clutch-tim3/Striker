@@ -8,7 +8,9 @@ class AttackClassifier:
         # File events
         'ransomware_extension_detected': 'ransomware',
         'mass_file_modification':        'ransomware',
+        'high_entropy_write':            'ransomware',
         'persistence_file_drop':         'backdoor',
+        'suspicious_ancestry':           'backdoor',
         # Network events
         'beacon_pattern':                'c2_beacon',
         'suspicious_port_connection':    'c2_beacon',

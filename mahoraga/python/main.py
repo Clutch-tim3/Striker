@@ -114,6 +114,7 @@ class MahoragaApp:
         self.file_watcher.start()
         self.adaptation_scheduler.start()
         self.demo_simulator.start()
+        threading.Thread(target=self._sensor_watchdog, daemon=True).start()
         emit('MONITORING_STARTED', {'status': 'active', 'demo': True})
         logger.info('All sensors started (demo mode active)')
 
@@ -122,7 +123,45 @@ class MahoragaApp:
         self.network_sniffer.stop()
         self.file_watcher.stop()
         self.demo_simulator.stop()
+        self._monitoring = False
         emit('MONITORING_STOPPED', {'status': 'inactive'})
+
+    def _sensor_watchdog(self):
+        """Restart any sensor that dies silently. Runs for the lifetime of the process."""
+        self._monitoring = True
+        own_pid = os.getpid()
+        while self._monitoring:
+            time.sleep(10)
+            try:
+                # Restart dead sensors
+                if not self.process_monitor.running:
+                    logger.warning('ProcessMonitor died — restarting')
+                    self.process_monitor.start()
+                if not self.file_watcher.running:
+                    logger.warning('FileWatcher died — restarting')
+                    self.file_watcher.start()
+
+                # Self-protection: detect if our own process is being targeted
+                import psutil
+                try:
+                    own = psutil.Process(own_pid)
+                    for child in psutil.process_iter(['pid', 'name', 'ppid']):
+                        try:
+                            if (child.info['ppid'] != own_pid and
+                                    child.info['name'] and
+                                    'mahoraga' in child.info['name'].lower()):
+                                self.on_telemetry({
+                                    'source': 'process', 'event': 'suspicious_ancestry',
+                                    'pid': child.info['pid'], 'name': child.info['name'],
+                                    'attack_hint': 'rootkit', 'severity_hint': 9,
+                                    'detail': 'Process impersonating Mahoraga detected',
+                                })
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.error(f'Watchdog error: {e}')
 
     def on_telemetry(self, telemetry: dict):
         if not self.config.get('anomaly_enabled', True):
@@ -133,12 +172,37 @@ class MahoragaApp:
         behaviour_hit = self.behaviour_classifier.classify(telemetry) if self.config.get('behaviour_enabled', True) else None
         heuristic_hit = self.heuristics.check(telemetry) if self.config.get('heuristics_enabled', True) else False
 
+        # Vector similarity catch — known pattern = guaranteed detection
+        similar = self.vector_index.find_similar(telemetry, top_k=1)
+        similarity_hit = bool(similar)
+
         threshold = self.config.get('anomaly_threshold', 0.75)
-        is_threat = anomaly_score > threshold or bool(behaviour_hit) or heuristic_hit
+
+        # Guaranteed floor — any sensor that explicitly flagged a high-severity
+        # event or attack hint CANNOT be filtered out by the ML threshold.
+        sensor_flagged = (
+            telemetry.get('severity_hint', 0) >= 7 or
+            bool(telemetry.get('attack_hint')) or
+            bool(telemetry.get('event') in {
+                'gatekeeper_bypass', 'persistence_mechanism', 'keychain_access',
+                'download_execute', 'powershell_encoded', 'powershell_hidden',
+                'shadow_copy_deletion', 'lolbin_download', 'credential_dump_tool',
+                'kernel_module_load', 'ld_preload_injection', 'reverse_shell',
+                'cron_modification', 'applescript_execution', 'persistence_file_drop',
+                'ransomware_extension_detected', 'mass_file_modification',
+                'high_entropy_write', 'suspicious_ancestry',
+            })
+        )
+
+        is_threat = (
+            anomaly_score > threshold or
+            bool(behaviour_hit) or
+            heuristic_hit or
+            similarity_hit or
+            sensor_flagged
+        )
         if not is_threat:
             return
-
-        similar = self.vector_index.find_similar(telemetry, top_k=1)
 
         # ── LAYER 3: ANALYSE ───────────────────────────────────────────
         attack_type = behaviour_hit or self.attack_classifier.classify(telemetry)

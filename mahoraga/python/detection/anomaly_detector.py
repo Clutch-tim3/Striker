@@ -8,6 +8,9 @@ logger = get_logger('anomaly_detector')
 MODEL_PATH = os.path.join(os.path.dirname(__file__), '../../models/anomaly_model.pkl')
 
 
+ROLLING_WINDOW = 2000  # keep last N samples — never forget the baseline
+
+
 class AnomalyDetector:
     def __init__(self):
         self.model = self._load_or_create()
@@ -68,9 +71,10 @@ class AnomalyDetector:
                 os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
                 with open(MODEL_PATH, 'wb') as f:
                     pickle.dump(self.model, f)
+                # Rolling window: keep the most recent samples, discard only the oldest
                 with self._lock:
-                    self.training_buffer.clear()
-                logger.info('Anomaly model retrained on local data')
+                    self.training_buffer = self.training_buffer[-ROLLING_WINDOW:]
+                logger.info(f'Anomaly model retrained — {len(buf)} samples, window={ROLLING_WINDOW}')
             except Exception as e:
                 logger.error(f'Retrain failed: {e}')
         threading.Thread(target=retrain, daemon=True).start()

@@ -594,6 +594,8 @@ function getMitre(event) {
     persistence_mechanism:  'T1543.001',
     keychain_access:        'T1555.001',
     high_risk_process:      'T1059',
+    high_entropy_write:     'T1486',
+    suspicious_ancestry:    'T1059.003',
   };
   return map[event] || 'T1059';
 }
