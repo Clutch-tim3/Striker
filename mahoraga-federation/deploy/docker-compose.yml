@@ -1,0 +1,26 @@
+version: '3.9'
+
+services:
+  federation:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - federation_data:/app/models
+      - federation_db:/app
+    environment:
+      # Change these before deploying — generate with:
+      # python3 -c "import secrets; print('mhf_' + secrets.token_hex(24))"
+      - MAHORAGA_CLIENT_KEY=mhf_change_this_client_key
+      - MAHORAGA_ADMIN_KEY=mhf_change_this_admin_key
+      - RETRAIN_THRESHOLD=50
+      - RETRAIN_HOUR=2
+      - RETRAIN_MINUTE=0
+      - LOG_LEVEL=INFO
+
+volumes:
+  federation_data:
+  federation_db:

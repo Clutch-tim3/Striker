@@ -1,0 +1,217 @@
+/* ─── SIDEBAR ──────────────────────────────────────────────────── */
+
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--sidebar-w);
+  background: var(--black);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  -webkit-app-region: drag;
+}
+
+/* Logo strip */
+.sidebar-logo {
+  padding: 22px 18px 18px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  -webkit-app-region: no-drag;
+}
+
+.logo-mark {
+  width: 30px;
+  height: 30px;
+  background: var(--red);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--white);
+  flex-shrink: 0;
+  letter-spacing: -0.03em;
+}
+
+.logo-text {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: var(--tracking-tight);
+}
+
+.logo-sub {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+
+/* Nav */
+.sidebar-nav {
+  flex: 1;
+  padding: 14px 10px;
+  overflow-y: auto;
+  -webkit-app-region: no-drag;
+}
+
+.nav-section-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.25);
+  padding: 10px 8px 5px;
+  margin-top: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  color: rgba(255,255,255,0.55);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.14s;
+  cursor: pointer;
+  margin-bottom: 1px;
+  -webkit-user-select: none;
+  letter-spacing: -0.01em;
+}
+
+.nav-item:hover {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.88);
+  text-decoration: none;
+}
+
+.nav-item.active {
+  background: var(--red);
+  color: var(--white);
+  font-weight: 600;
+}
+
+.nav-item.active:hover { background: var(--red-dark); }
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.nav-item.active .nav-icon { opacity: 1; }
+
+.nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 20px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.nav-item.active .nav-badge {
+  background: rgba(255,255,255,0.25);
+}
+
+/* Version tag */
+.nav-version-tag {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Status strip */
+.sidebar-status {
+  padding: 14px 16px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  -webkit-app-region: no-drag;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3EC87A;
+  animation: pulse 2.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.status-dot.inactive { background: rgba(255,255,255,0.18); animation: none; }
+.status-dot.alert    { background: var(--red); animation: pulse 0.8s ease-in-out infinite; }
+
+.status-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: -0.01em;
+}
+
+.status-label strong {
+  color: rgba(255,255,255,0.75);
+  font-weight: 600;
+}
+
+.status-label .alert { color: #FF6B6B; }
+
+.sidebar-tier {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tier-badge.free {
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.35);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.tier-badge.pro {
+  background: var(--red);
+  color: var(--white);
+}
+
+/* Sidebar footer note */
+.sidebar-footer-note {
+  font-size: 10px;
+  color: rgba(255,255,255,0.2);
+  margin-top: 6px;
+  letter-spacing: 0.01em;
+}

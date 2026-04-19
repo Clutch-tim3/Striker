@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.pyc
+__pycache__/
+*.egg-info/
+.env
+~/.mahoraga/
+models/*.pkl
+*.log
+.DS_Store
+build/

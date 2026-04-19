@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com;
+             font-src 'self' https://fonts.gstatic.com;
+             script-src 'self';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;">
+  <title>Mahoraga</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">M</div>
+      <div>
+        <div class="logo-text">Mahoraga</div>
+        <div class="logo-sub">EDR · v1.0</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Monitor</div>
+      <a class="nav-item active" href="index.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="2" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="2" y="11" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="11" width="7" height="7" rx="1.5"/>
+        </svg>
+        Dashboard
+      </a>
+      <a class="nav-item" href="archive.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v1H3V5z"/>
+          <path d="M3 6h14v10a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/>
+          <path d="M8 10h4M8 13h2"/>
+        </svg>
+        Antibody Archive
+        <span class="nav-badge" id="archive-count" style="display:none">0</span>
+      </a>
+
+      <div class="nav-section-label">Intel</div>
+      <a class="nav-item" href="map.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="8"/>
+          <path d="M2 10h16M10 2a14 14 0 000 16M10 2a14 14 0 010 16"/>
+        </svg>
+        Threat Map
+        <span class="nav-version-tag">v3</span>
+      </a>
+
+      <div class="nav-section-label">Config</div>
+      <a class="nav-item" href="settings.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="3"/>
+          <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/>
+        </svg>
+        Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-status">
+      <div class="status-indicator">
+        <div class="status-dot" id="status-dot"></div>
+        <div class="status-label">Status: <strong id="status-text">Active</strong></div>
+      </div>
+      <div class="sidebar-tier" style="margin-top:8px">
+        <span class="tier-badge free" id="tier-badge">Free</span>
+        <span class="sidebar-footer-note">Donington Vale</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────────── -->
+  <main class="main-content">
+    <div class="page">
+
+      <!-- Demo mode banner -->
+      <div id="demo-banner" style="display:none;align-items:center;gap:12px;
+           background:var(--black);border-radius:var(--radius);padding:10px 16px;
+           margin-bottom:18px;border-left:3px solid var(--red)">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--red);
+                    animation:pulse 1.2s infinite;flex-shrink:0"></div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.6);letter-spacing:-0.01em">
+          <strong style="color:var(--white)">Demo mode</strong> —
+          simulated threats are being injected every 10–25 seconds so you can explore the full detection pipeline
+        </div>
+      </div>
+
+      <!-- Alert banner -->
+      <div class="alert-banner" id="active-alert" style="display:none">
+        <div class="alert-banner-icon">⚠</div>
+        <div class="alert-banner-text">
+          <div class="alert-banner-title" id="alert-title">Critical threat detected</div>
+          <div class="alert-banner-sub" id="alert-sub">Automatic response initiated</div>
+        </div>
+        <button class="btn btn-xs" style="background:var(--red);color:var(--white);border:none"
+          onclick="dismissAlert()">Dismiss</button>
+      </div>
+
+      <!-- Page header -->
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px;letter-spacing:-0.01em">
+            Real-time endpoint protection
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" id="btn-start-stop" onclick="toggleMonitoring()">
+            Pause Monitoring
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stat-grid">
+        <div class="stat-card" id="stat-threats">
+          <div class="stat-label">Threats Today</div>
+          <div class="stat-value" id="threats-today">0</div>
+          <div class="stat-sub">Past 24 hours</div>
+        </div>
+        <div class="stat-card" id="stat-neutralised">
+          <div class="stat-label">Neutralised</div>
+          <div class="stat-value" id="neutralised-count" style="color:var(--red)">0</div>
+          <div class="stat-sub">Auto-responded</div>
+        </div>
+        <div class="stat-card" id="stat-antibodies">
+          <div class="stat-label">Antibodies</div>
+          <div class="stat-value" id="antibody-count">0</div>
+          <div class="stat-sub">Total archive</div>
+        </div>
+
+        <!-- 4th stat — black card -->
+        <div style="background:var(--black);border-radius:var(--radius-lg);padding:20px 22px;position:relative;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--red)"></div>
+          <div class="stat-label" style="color:rgba(255,255,255,0.4)">Adaptation Index</div>
+          <div class="stat-value" id="model-score" style="color:var(--white)">72</div>
+          <div class="stat-sub" style="color:rgba(255,255,255,0.3)">Model accuracy</div>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="dashboard-grid">
+
+        <!-- Threat feed -->
+        <div class="threat-feed-container">
+          <div class="threat-feed-header">
+            <div class="threat-feed-title">
+              <div class="live-dot" id="live-dot"></div>
+              Live Threat Feed
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-xs btn-ghost" onclick="clearFeed()">Clear</button>
+            </div>
+          </div>
+          <div class="threat-feed-body" id="threat-feed">
+            <div class="empty-state" id="feed-empty">
+              <div class="empty-state-icon">🛡</div>
+              <div class="empty-state-title">System secure</div>
+              <div class="empty-state-sub">No threats detected. Monitoring all sensors.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right panel -->
+        <div class="right-panel">
+
+          <!-- Adaptation — black card -->
+          <div class="adaptation-card">
+            <div class="card-title">Adaptation Index</div>
+            <div class="adaptation-ring-wrap">
+              <div class="adaptation-ring">
+                <svg viewBox="0 0 68 68">
+                  <circle cx="34" cy="34" r="28" fill="none"
+                    stroke="rgba(255,255,255,0.1)" stroke-width="7"/>
+                  <circle cx="34" cy="34" r="28" fill="none"
+                    stroke="#922724" stroke-width="7"
+                    stroke-linecap="round"
+                    stroke-dasharray="175.9"
+                    stroke-dashoffset="47.5"
+                    id="adaptation-arc"/>
+                </svg>
+              </div>
+              <div class="adaptation-stat">
+                <div class="adaptation-number">
+                  <span id="adaptation-pct">72</span><span>%</span>
+                </div>
+                <div class="adaptation-desc">
+                  Model learns from<br>every new threat
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Activity — white card -->
+          <div class="card">
+            <div class="card-header" style="margin-bottom:10px">
+              <div class="card-title">Activity (24h)</div>
+            </div>
+            <div class="activity-chart" id="activity-chart"></div>
+          </div>
+
+          <!-- Attack types — white card -->
+          <div class="card">
+            <div class="card-header" style="margin-bottom:14px">
+              <div class="card-title">Attack Breakdown</div>
+            </div>
+            <div class="attack-type-list" id="attack-type-list">
+              <div style="color:var(--text-3);font-size:12px;padding:8px 0">No threats recorded yet.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Threat modal -->
+<div class="modal-overlay" id="threat-modal" style="display:none" onclick="closeThreatModal(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-threat-title">Threat Details</div>
+    <div id="modal-content"></div>
+    <div style="display:flex;gap:8px;margin-top:22px;justify-content:flex-end">
+      <button class="btn btn-secondary btn-sm" onclick="closeThreatModal()">Close</button>
+      <button class="btn btn-sm" style="background:var(--black);color:var(--white);display:none" id="modal-kill-btn">Kill Process</button>
+      <button class="btn btn-sm btn-danger" id="modal-quarantine-btn" style="display:none">Quarantine</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/ipc.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/threat-feed.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>

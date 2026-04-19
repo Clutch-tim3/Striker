@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com;
+             font-src 'self' https://fonts.gstatic.com;
+             script-src 'self';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;">
+  <title>Mahoraga — Archive</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/archive.css">
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">M</div>
+      <div>
+        <div class="logo-text">Mahoraga</div>
+        <div class="logo-sub">EDR · v1.0</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Monitor</div>
+      <a class="nav-item" href="index.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="2" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="2" y="11" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="11" width="7" height="7" rx="1.5"/>
+        </svg>
+        Dashboard
+      </a>
+      <a class="nav-item active" href="archive.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v1H3V5z"/>
+          <path d="M3 6h14v10a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/>
+          <path d="M8 10h4M8 13h2"/>
+        </svg>
+        Antibody Archive
+      </a>
+      <div class="nav-section-label">Intel</div>
+      <a class="nav-item" href="map.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="8"/>
+          <path d="M2 10h16M10 2a14 14 0 000 16M10 2a14 14 0 010 16"/>
+        </svg>
+        Threat Map
+        <span class="nav-version-tag">v3</span>
+      </a>
+      <div class="nav-section-label">Config</div>
+      <a class="nav-item" href="settings.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="3"/>
+          <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/>
+        </svg>
+        Settings
+      </a>
+    </nav>
+    <div class="sidebar-status">
+      <div class="status-indicator">
+        <div class="status-dot" id="status-dot"></div>
+        <div class="status-label">Status: <strong id="status-text">Active</strong></div>
+      </div>
+      <div class="sidebar-tier" style="margin-top:8px">
+        <span class="tier-badge free" id="tier-badge">Free</span>
+        <span class="sidebar-footer-note">Donington Vale</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">Antibody Archive</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+            Every detected threat stored as a structured antibody
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="archive-count-pill">
+            <span id="archive-total">0</span> antibodies
+          </span>
+          <div class="view-toggle">
+            <button class="view-toggle-btn active" id="btn-grid" onclick="setView('grid')">Grid</button>
+            <button class="view-toggle-btn" id="btn-list" onclick="setView('list')">List</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="archive-toolbar">
+        <input class="archive-search" type="text" id="search-input"
+          placeholder="Search attack types, MITRE IDs…" oninput="filterArchive()">
+        <select class="archive-filter" id="filter-type" onchange="filterArchive()">
+          <option value="">All Attack Types</option>
+          <option value="ransomware">Ransomware</option>
+          <option value="c2_beacon">C2 Beacon</option>
+          <option value="data_exfil">Data Exfiltration</option>
+          <option value="rootkit">Rootkit</option>
+          <option value="backdoor">Backdoor</option>
+          <option value="keylogger">Keylogger</option>
+          <option value="cryptominer">Cryptominer</option>
+          <option value="worm">Worm</option>
+          <option value="privilege_escalation">Privilege Escalation</option>
+        </select>
+        <select class="archive-filter" id="filter-severity" onchange="filterArchive()">
+          <option value="">All Severities</option>
+          <option value="8">Critical (8–10)</option>
+          <option value="5">High (5–7)</option>
+          <option value="1">Low (1–4)</option>
+        </select>
+        <button class="btn btn-black btn-sm" onclick="exportArchive()">Export CSV</button>
+      </div>
+
+      <!-- Grid -->
+      <div class="antibody-grid" id="grid-view">
+        <div class="empty-state" id="archive-empty" style="grid-column:1/-1">
+          <div class="empty-state-icon">🔬</div>
+          <div class="empty-state-title">Archive is empty</div>
+          <div class="empty-state-sub">Antibodies are created when threats are detected and neutralised.</div>
+        </div>
+      </div>
+
+      <!-- List -->
+      <div class="archive-list-view" id="list-view" style="display:none">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Attack Type</th>
+              <th>MITRE ID</th>
+              <th>Severity</th>
+              <th>Source</th>
+              <th>Response</th>
+              <th>Date</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="list-tbody"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Antibody modal -->
+<div class="modal-overlay" id="antibody-modal" style="display:none" onclick="closeAntibodyModal(event)">
+  <div class="modal">
+    <div class="modal-title" id="antibody-modal-title">Antibody Details</div>
+    <div id="antibody-modal-content"></div>
+    <div style="display:flex;gap:8px;margin-top:22px;justify-content:flex-end">
+      <button class="btn btn-secondary btn-sm" onclick="closeAntibodyModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/ipc.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/archive.js"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+{
+  "name": "mahoraga",
+  "version": "1.0.0",
+  "description": "Mahoraga — Adaptive Cybersecurity EDR by Donington Vale",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "bash scripts/dev.sh",
+    "build": "bash scripts/build-all.sh",
+    "build:python": "bash scripts/build-python.sh",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "keywords": [
+    "security",
+    "edr",
+    "cybersecurity",
+    "antivirus",
+    "endpoint"
+  ],
+  "author": "Donington Vale",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.donington-vale.mahoraga",
+    "productName": "Mahoraga",
+    "copyright": "Copyright © 2024 Donington Vale",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "models/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/python",
+        "to": "python",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns",
+      "darkModeSupport": true
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

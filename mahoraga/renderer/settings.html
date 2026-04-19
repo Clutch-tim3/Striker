@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com;
+             font-src 'self' https://fonts.gstatic.com;
+             script-src 'self';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;">
+  <title>Mahoraga — Settings</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">M</div>
+      <div>
+        <div class="logo-text">Mahoraga</div>
+        <div class="logo-sub">EDR · v1.0</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Monitor</div>
+      <a class="nav-item" href="index.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="2" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="2" y="11" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="11" width="7" height="7" rx="1.5"/>
+        </svg>
+        Dashboard
+      </a>
+      <a class="nav-item" href="archive.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v1H3V5z"/>
+          <path d="M3 6h14v10a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/>
+        </svg>
+        Antibody Archive
+      </a>
+      <div class="nav-section-label">Intel</div>
+      <a class="nav-item" href="map.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="8"/>
+          <path d="M2 10h16M10 2a14 14 0 000 16M10 2a14 14 0 010 16"/>
+        </svg>
+        Threat Map
+        <span class="nav-version-tag">v3</span>
+      </a>
+      <div class="nav-section-label">Config</div>
+      <a class="nav-item active" href="settings.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="3"/>
+          <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/>
+        </svg>
+        Settings
+      </a>
+    </nav>
+    <div class="sidebar-status">
+      <div class="status-indicator">
+        <div class="status-dot" id="status-dot"></div>
+        <div class="status-label">Status: <strong id="status-text">Active</strong></div>
+      </div>
+      <div class="sidebar-tier" style="margin-top:8px">
+        <span class="tier-badge free" id="tier-badge">Free</span>
+        <span class="sidebar-footer-note">Donington Vale</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page" style="max-width:700px">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">Settings</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+            Configure detection, response, and adaptation behaviour
+          </div>
+        </div>
+      </div>
+
+      <!-- License — black card -->
+      <div style="background:var(--black);border-radius:var(--radius-lg);padding:24px 26px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div class="card-title" style="color:rgba(255,255,255,0.4)">License</div>
+          <span class="tier-badge free" id="settings-tier-badge">Free Plan</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="license-key"
+            placeholder="clive_xxxxxxxxxxxxxxxxxxxx"
+            style="flex:1;background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.1);color:var(--white)">
+          <button class="btn btn-sm" style="background:var(--red);color:var(--white);border:none;white-space:nowrap"
+            onclick="activateLicense()">Activate Key</button>
+        </div>
+        <div id="license-status" style="font-size:12px;margin-top:10px;min-height:16px"></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.07);
+                    font-size:11px;color:rgba(255,255,255,0.25)">
+          Get your license key at <strong style="color:rgba(255,255,255,0.4)">clive.dev</strong>
+        </div>
+      </div>
+
+      <!-- Detection -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">Detection Engines</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-weight:600;font-size:13px;letter-spacing:-0.01em">Anomaly Detection</div>
+              <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+                Isolation Forest — flags statistically unusual behaviour
+              </div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="toggle-anomaly" checked onchange="saveSettings()"><div class="toggle-track"></div></label>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-weight:600;font-size:13px;letter-spacing:-0.01em">Behaviour Classification</div>
+              <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+                Random Forest — maps behaviour to known attack families
+              </div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="toggle-behaviour" checked onchange="saveSettings()"><div class="toggle-track"></div></label>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0">
+            <div>
+              <div style="font-weight:600;font-size:13px;letter-spacing:-0.01em">Zero-day Heuristics</div>
+              <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+                Rule-based checks for LOLBins, injection, ransomware patterns
+              </div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="toggle-heuristics" checked onchange="saveSettings()"><div class="toggle-track"></div></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Response -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header" style="margin-bottom:4px">
+          <div class="card-title">Automatic Response</div>
+        </div>
+
+        <div style="padding:14px 0;border-bottom:1px solid var(--border)">
+          <div class="form-group" style="margin-bottom:0">
+            <div class="label">Auto-kill threshold (severity ≥ N)</div>
+            <select id="auto-kill-threshold" onchange="saveSettings()" style="width:100%">
+              <option value="10">10 — Disabled (never auto-kill)</option>
+              <option value="8" selected>8 — Critical only (recommended)</option>
+              <option value="6">6 — High and critical</option>
+              <option value="4">4 — Medium and above</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-weight:600;font-size:13px;letter-spacing:-0.01em">Auto-quarantine files</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">Move malicious files to encrypted vault</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="toggle-quarantine" checked onchange="saveSettings()"><div class="toggle-track"></div></label>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0">
+          <div>
+            <div style="font-weight:600;font-size:13px;letter-spacing:-0.01em">Network isolation</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+              Disable NIC if ransomware or C2 beacon detected at severity ≥ 6
+            </div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="toggle-isolate" onchange="saveSettings()"><div class="toggle-track"></div></label>
+        </div>
+      </div>
+
+      <!-- Adaptation -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header" style="margin-bottom:4px">
+          <div class="card-title">Adaptation</div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-weight:600;font-size:13px;letter-spacing:-0.01em">Nightly model retraining</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+              Retrain ML models at 2 AM using locally accumulated threat data
+            </div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="toggle-nightly" checked onchange="saveSettings()"><div class="toggle-track"></div></label>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-weight:600;font-size:13px;letter-spacing:-0.01em">Federated learning</span>
+              <span class="badge badge-info" style="font-size:10px">Pro · v3</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+              Contribute anonymous vectors to the global model — protect everyone
+            </div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="toggle-federated" disabled><div class="toggle-track"></div></label>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+        <button class="btn btn-secondary" onclick="loadSettings()">Revert</button>
+        <span id="save-status" style="font-size:12px;color:var(--red);margin-left:4px"></span>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/ipc.js"></script>
+<script>
+  function activateLicense() {
+    const key = document.getElementById('license-key').value.trim();
+    if (!key) return;
+    window.mahoraga.send('ACTIVATE_LICENSE', { key });
+  }
+
+  function saveSettings() {
+    const cfg = {
+      anomaly_enabled:      document.getElementById('toggle-anomaly').checked,
+      behaviour_enabled:    document.getElementById('toggle-behaviour').checked,
+      heuristics_enabled:   document.getElementById('toggle-heuristics').checked,
+      auto_kill_threshold:  parseInt(document.getElementById('auto-kill-threshold').value),
+      auto_quarantine:      document.getElementById('toggle-quarantine').checked,
+      auto_isolate:         document.getElementById('toggle-isolate').checked,
+      nightly_retrain:      document.getElementById('toggle-nightly').checked,
+      federated_enabled:    false,
+    };
+    window.mahoraga.send('SET_CONFIG', cfg);
+    const el = document.getElementById('save-status');
+    el.textContent = 'Settings saved.';
+    setTimeout(() => { el.textContent = ''; }, 2200);
+  }
+
+  function loadSettings() {
+    window.mahoraga.send('GET_CONFIG');
+  }
+
+  window.mahoraga.onEvent((event) => {
+    if (event.type === 'CONFIG_DATA') {
+      const d = event.data;
+      if (d.anomaly_enabled !== undefined) document.getElementById('toggle-anomaly').checked = d.anomaly_enabled;
+      if (d.behaviour_enabled !== undefined) document.getElementById('toggle-behaviour').checked = d.behaviour_enabled;
+      if (d.heuristics_enabled !== undefined) document.getElementById('toggle-heuristics').checked = d.heuristics_enabled;
+      if (d.auto_kill_threshold !== undefined) document.getElementById('auto-kill-threshold').value = d.auto_kill_threshold;
+      if (d.auto_quarantine !== undefined) document.getElementById('toggle-quarantine').checked = d.auto_quarantine;
+      if (d.auto_isolate !== undefined) document.getElementById('toggle-isolate').checked = d.auto_isolate;
+      if (d.nightly_retrain !== undefined) document.getElementById('toggle-nightly').checked = d.nightly_retrain;
+      if (d.tier) {
+        const badge = document.getElementById('tier-badge');
+        const sbadge = document.getElementById('settings-tier-badge');
+        const label = d.tier === 'pro' ? 'Pro Plan' : 'Free Plan';
+        badge.textContent = d.tier.charAt(0).toUpperCase() + d.tier.slice(1);
+        badge.className = 'tier-badge ' + d.tier;
+        if (sbadge) { sbadge.textContent = label; sbadge.className = 'tier-badge ' + d.tier; }
+      }
+    }
+    if (event.type === 'LICENSE_RESULT') {
+      const el = document.getElementById('license-status');
+      if (event.data.valid) {
+        el.style.color = '#3EC87A';
+        el.textContent = '✓ License activated. Welcome to Pro!';
+        const b = document.getElementById('settings-tier-badge');
+        if (b) { b.textContent = 'Pro Plan'; b.className = 'tier-badge pro'; }
+      } else {
+        el.style.color = '#FF6B6B';
+        el.textContent = '✗ Invalid license key. Get yours at clive.dev.';
+      }
+    }
+  });
+
+  loadSettings();
+</script>
+</body>
+</html>
