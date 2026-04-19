@@ -9,7 +9,8 @@
     "build": "bash scripts/build-all.sh",
     "build:python": "bash scripts/build-python.sh",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "release": "bash scripts/release.sh"
   },
   "keywords": [
     "security",

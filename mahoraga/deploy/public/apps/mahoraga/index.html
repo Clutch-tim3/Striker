@@ -319,14 +319,13 @@
   const isMac   = ua.includes('Mac OS');
   const isLinux = ua.includes('Linux') && !ua.includes('Android');
 
-  const BASE = 'https://firebasestorage.googleapis.com/v0/b/clive-6d22e.appspot.com/o/apps%2Fmahoraga%2F';
   const VER  = '1.0.0';
-  const Q    = '?alt=media';
+  const GH   = `https://github.com/Clutch-tim3/Striker/releases/download/v${VER}`;
 
   const links = {
-    mac:   `${BASE}v${VER}%2FMahoraga-${VER}.dmg${Q}`,
-    win:   `${BASE}v${VER}%2FMahoraga-Setup-${VER}.exe${Q}`,
-    linux: `${BASE}v${VER}%2FMahoraga-${VER}.AppImage${Q}`,
+    mac:   `${GH}/Mahoraga-${VER}.dmg`,
+    win:   `${GH}/Mahoraga-Setup-${VER}.exe`,
+    linux: `${GH}/Mahoraga-${VER}.AppImage`,
   };
 
   document.getElementById('dl-mac').href   = links.mac;
