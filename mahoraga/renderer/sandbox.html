@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com;
+             font-src 'self' https://fonts.gstatic.com;
+             script-src 'self';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;">
+  <title>Sandbox — Mahoraga</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/sandbox.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">M</div>
+      <div>
+        <div class="logo-text">Mahoraga</div>
+        <div class="logo-sub">EDR · v1.0</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Monitor</div>
+      <a class="nav-item" href="index.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="2" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="2" y="11" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="11" width="7" height="7" rx="1.5"/>
+        </svg>
+        Dashboard
+      </a>
+      <a class="nav-item" href="archive.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v1H3V5z"/>
+          <path d="M3 6h14v10a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/>
+          <path d="M8 10h4M8 13h2"/>
+        </svg>
+        Antibody Archive
+      </a>
+      <div class="nav-section-label">Intel</div>
+      <a class="nav-item" href="map.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="8"/>
+          <path d="M2 10h16M10 2a14 14 0 000 16M10 2a14 14 0 010 16"/>
+        </svg>
+        Threat Map
+      </a>
+      <div class="nav-section-label">Lab</div>
+      <a class="nav-item active" href="sandbox.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M7 3v6l-3 6h12l-3-6V3"/>
+          <path d="M7 3h6"/>
+          <circle cx="10" cy="14" r="1" fill="currentColor" stroke="none"/>
+        </svg>
+        Sandbox
+        <span class="nav-version-tag">Beta</span>
+      </a>
+      <div class="nav-section-label">Config</div>
+      <a class="nav-item" href="settings.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="3"/>
+          <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/>
+        </svg>
+        Settings
+      </a>
+    </nav>
+    <div class="sidebar-status">
+      <div class="status-indicator">
+        <div class="status-dot" id="status-dot"></div>
+        <div class="status-label">Status: <strong id="status-text">Active</strong></div>
+      </div>
+      <div class="sidebar-tier" style="margin-top:8px">
+        <span class="tier-badge free">Free</span>
+        <span class="sidebar-footer-note">Donington Vale</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────────── -->
+  <main class="main-content">
+    <div class="page sb-page">
+
+      <!-- Page header -->
+      <div class="page-header">
+        <div>
+          <div class="page-title">Attack Sandbox</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px;letter-spacing:-0.01em">
+            Simulate real attacks. Watch Mahoraga detect and adapt in real time.
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="sb-score-pill">
+            <span class="sb-score-icon">⚡</span>
+            <span id="sb-score">0</span>
+            <span style="color:var(--text-3);font-weight:400"> pts</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-reset" onclick="sbReset()">Reset Session</button>
+        </div>
+      </div>
+
+      <!-- Main sandbox grid -->
+      <div class="sb-grid">
+
+        <!-- ── LEFT: Target + attack selector ─────────────── -->
+        <div class="sb-left">
+
+          <!-- Target picker -->
+          <div class="sb-section-label">SELECT TARGET</div>
+          <div class="sb-target-list" id="sb-target-list">
+            <!-- populated by JS -->
+          </div>
+
+          <!-- Attack modules -->
+          <div class="sb-section-label" style="margin-top:20px">ATTACK MODULES</div>
+          <div class="sb-module-list" id="sb-module-list">
+            <div class="sb-module-empty">Select a target to see available attack modules.</div>
+          </div>
+
+        </div>
+
+        <!-- ── CENTRE: Terminal ────────────────────────────── -->
+        <div class="sb-centre">
+          <div class="sb-terminal">
+            <div class="sb-terminal-bar">
+              <div class="sb-terminal-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="sb-terminal-title" id="sb-terminal-title">mahoraga-sandbox — bash</div>
+              <div style="width:52px"></div>
+            </div>
+            <div class="sb-terminal-body" id="sb-terminal-body">
+              <div class="sb-terminal-welcome">
+                <span class="sb-t-red">mahoraga</span><span class="sb-t-dim">@sandbox</span><span class="sb-t-dim">:~$</span>
+                <span class="sb-t-muted"> Welcome to the Mahoraga Attack Sandbox.</span><br>
+                <span class="sb-t-dim">Select a target and an attack module to begin.</span><br><br>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="sb-attack-progress" id="sb-attack-progress" style="display:none">
+            <div class="sb-progress-label">
+              <span id="sb-progress-text">Running exploit...</span>
+              <span id="sb-progress-pct">0%</span>
+            </div>
+            <div class="sb-progress-track">
+              <div class="sb-progress-fill" id="sb-progress-fill"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── RIGHT: Detection feed ───────────────────────── -->
+        <div class="sb-right">
+          <div class="sb-detect-header">
+            <div class="sb-detect-title">
+              <div class="live-dot" id="sb-live-dot" style="opacity:0.3"></div>
+              Detection Feed
+            </div>
+            <div class="sb-detect-stats">
+              <span id="sb-caught">0</span> caught · <span id="sb-evaded">0</span> evaded
+            </div>
+          </div>
+          <div class="sb-detect-body" id="sb-detect-body">
+            <div class="sb-detect-empty" id="sb-detect-empty">
+              No attacks launched yet.<br>Detection events will appear here.
+            </div>
+          </div>
+
+          <!-- Scoreboard -->
+          <div class="sb-section-label" style="margin-top:16px">SESSION LOG</div>
+          <div class="sb-log" id="sb-log">
+            <div class="sb-log-empty">No completed attacks yet.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Attack result modal -->
+<div class="modal-overlay" id="sb-result-modal" style="display:none" onclick="sbCloseModal(event)">
+  <div class="modal sb-result-inner">
+    <div class="sb-result-top" id="sb-result-top">
+      <div class="sb-result-icon" id="sb-result-icon">🛡</div>
+      <div class="sb-result-verdict" id="sb-result-verdict">Detected</div>
+      <div class="sb-result-sub"   id="sb-result-sub">Mahoraga neutralised the attack</div>
+    </div>
+    <div class="sb-result-rows" id="sb-result-rows"></div>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+      <button class="btn btn-secondary btn-sm" onclick="sbCloseModal()">Close</button>
+      <button class="btn btn-sm" style="background:var(--black);color:var(--white)" onclick="sbCloseModal();sbNextAttack()">Next Attack →</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/ipc.js"></script>
+<script src="js/sandbox.js"></script>
+</body>
+</html>
