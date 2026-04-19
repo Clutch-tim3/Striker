@@ -431,3 +431,43 @@
 }
 .sb-result-row .lbl { color: var(--text-2); }
 .sb-result-row .val { font-weight: 600; }
+
+/* ── Difficulty badges from Python modules ──────────────────────────────── */
+.sb-badge-easy   { background: rgba(42,107,158,0.1);  color: #2A6B9E; }
+.sb-badge-medium { background: rgba(192,132,32,0.1);  color: #C08420; }
+.sb-badge-hard   { background: rgba(192,74,26,0.1);   color: #C04A1A; }
+.sb-badge-expert { background: rgba(146,39,36,0.1);   color: var(--red); }
+
+/* ── Module footer row (mitre + pts + duration) ─────────────────────────── */
+.sb-module-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  flex-wrap: wrap;
+}
+.sb-module-mitre {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  font-family: 'DM Mono', monospace;
+}
+.sb-module-dur {
+  font-size: 10px;
+  color: var(--text-3);
+  margin-left: auto;
+}
+
+/* ── Selected module highlight ──────────────────────────────────────────── */
+.sb-module.selected {
+  border-color: rgba(146,39,36,0.4);
+  background: rgba(146,39,36,0.03);
+}
+.sb-module-launch-hint {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--red);
+  margin-top: 6px;
+  letter-spacing: 0.02em;
+}

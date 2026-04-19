@@ -34,6 +34,8 @@ from python.archive.antibody import AntibodyStore
 from python.archive.vector_index import VectorIndex
 from python.adaptation.scheduler import AdaptationScheduler
 from python.analysis.insight_generator import generate as generate_insights
+from python.sandbox.simulator import AttackSimulator
+from python.sandbox.attack_modules import TARGET_MODULES, MODULES_BY_ID
 
 logger = get_logger('main')
 
@@ -46,7 +48,11 @@ class CommandRouter:
         handlers = {
             'START_MONITORING': self.app.start_monitoring,
             'STOP_MONITORING':  self.app.stop_monitoring,
-            'GET_ARCHIVE':      self.app.get_archive,
+            'GET_ARCHIVE':        self.app.get_archive,
+            'GET_ARCHIVE_STATS':  self.app.get_archive_stats,
+            'SANDBOX_GET_MODULES': self.app.sandbox_get_modules,
+            'SANDBOX_LAUNCH':     self.app.sandbox_launch,
+            'SANDBOX_RESET':      self.app.sandbox_reset_session,
             'QUARANTINE':       self.app.quarantine_file,
             'KILL_PROCESS':     self.app.kill_process,
             'ISOLATE_NETWORK':  self.app.isolate_network,
@@ -88,6 +94,7 @@ class MahoragaApp:
             self.antibody_store, self.anomaly_detector, self.behaviour_classifier
         )
         self.demo_simulator = ThreatSimulator(self.on_telemetry)
+        self.attack_simulator = AttackSimulator(self.on_telemetry)
 
         # Pre-fit anomaly detector with synthetic baseline so scores are meaningful
         self._seed_anomaly_model()
@@ -222,6 +229,10 @@ class MahoragaApp:
 
         emit('THREAT_DETECTED', threat)
 
+        # Notify sandbox simulator if a session is active
+        if self.attack_simulator.running:
+            self.attack_simulator.on_detection(threat)
+
         # ── LAYER 4: RESPOND ───────────────────────────────────────────
         response_taken = self.auto_respond(threat)
 
@@ -278,8 +289,39 @@ class MahoragaApp:
 
     def get_archive(self, payload: dict):
         filters = payload or {}
-        antibodies = self.antibody_store.query(filters)
-        emit('ARCHIVE_DATA', {'antibodies': antibodies})
+        try:
+            antibodies = self.antibody_store.query(filters)
+            emit('ARCHIVE_DATA', {'antibodies': antibodies, 'count': len(antibodies)})
+        except Exception as e:
+            emit('ARCHIVE_ERROR', {'message': str(e)})
+
+    def get_archive_stats(self, payload=None):
+        stats = self.antibody_store.get_stats()
+        emit('ARCHIVE_STATS', stats)
+
+    def sandbox_get_modules(self, payload: dict):
+        target_id = payload.get('target_id', '')
+        module_ids = TARGET_MODULES.get(target_id, [])
+        modules = []
+        for mid in module_ids:
+            m = MODULES_BY_ID.get(mid)
+            if m:
+                modules.append({
+                    'id': m.id, 'name': m.name, 'description': m.description,
+                    'technique': m.technique, 'mitre_id': m.mitre_id,
+                    'difficulty': m.difficulty, 'duration_sec': m.duration_sec,
+                    'points': m.points, 'target_os': m.target_os,
+                })
+        emit('SANDBOX_MODULES', {'target_id': target_id, 'modules': modules})
+
+    def sandbox_launch(self, payload: dict):
+        module_id = payload.get('module_id')
+        target_id = payload.get('target_id')
+        if module_id and target_id:
+            self.attack_simulator.launch(module_id, target_id)
+
+    def sandbox_reset_session(self, payload=None):
+        self.attack_simulator.reset_session()
 
     def get_config(self, payload=None):
         emit('CONFIG_DATA', self.config.to_dict())
