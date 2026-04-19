@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mahoraga — Adaptive EDR | Clive</title>
+  <meta name="description" content="Mahoraga is a self-learning endpoint defence system that detects, classifies, and neutralises threats in real time — no signature updates required." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0d0f;
+      --surface:   #141417;
+      --border:    #1e1e24;
+      --accent:    #c0392b;
+      --accent2:   #e74c3c;
+      --text:      #e8e6e3;
+      --muted:     #6b6b7a;
+      --badge-bg:  #1a0a09;
+      --badge-txt: #e74c3c;
+      --radius:    12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(13,13,15,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+    .nav-back  { color: var(--muted); font-size: 0.85rem; text-decoration: none; }
+    .nav-back:hover { color: var(--text); }
+
+    /* ── Hero ── */
+    .hero {
+      max-width: 960px; margin: 0 auto;
+      padding: 4rem 2rem 2rem;
+      display: grid; grid-template-columns: 96px 1fr; gap: 2rem; align-items: start;
+    }
+    .app-icon {
+      width: 96px; height: 96px; border-radius: 22px;
+      background: linear-gradient(135deg, #2d0a08 0%, #8b1c18 50%, #c0392b 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.8rem; flex-shrink: 0;
+      box-shadow: 0 8px 32px rgba(192,57,43,0.35);
+    }
+    .app-meta h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 0.3rem; }
+    .app-meta .tagline { color: var(--muted); font-size: 1rem; margin-bottom: 0.75rem; }
+    .badges { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .badge {
+      padding: 0.25rem 0.65rem; border-radius: 6px;
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+      background: var(--badge-bg); color: var(--badge-txt); border: 1px solid rgba(231,76,60,0.25);
+    }
+    .badge.neutral { background: #111; color: var(--muted); border-color: var(--border); }
+
+    /* ── Download buttons ── */
+    .downloads { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .dl-btn {
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0.6rem 1.1rem; border-radius: 9px; font-size: 0.88rem; font-weight: 600;
+      text-decoration: none; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text);
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      cursor: pointer;
+    }
+    .dl-btn:hover  { background: #1c1c20; border-color: #2e2e38; transform: translateY(-1px); }
+    .dl-btn:active { transform: translateY(0); }
+    .dl-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .dl-btn.primary:hover { background: var(--accent2); border-color: var(--accent2); }
+    .dl-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    /* ── Stats bar ── */
+    .stats {
+      max-width: 960px; margin: 2rem auto 0;
+      padding: 0 2rem;
+      display: flex; gap: 2rem; border-top: 1px solid var(--border); padding-top: 2rem;
+    }
+    .stat-item { display: flex; flex-direction: column; }
+    .stat-val { font-size: 1.1rem; font-weight: 700; }
+    .stat-lbl { font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
+
+    /* ── Screenshots ── */
+    .screenshots {
+      max-width: 960px; margin: 3rem auto 0; padding: 0 2rem;
+    }
+    .screenshots h2 { font-size: 1rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 1rem; }
+    .screenshot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+    .screenshot-card {
+      aspect-ratio: 16/10; border-radius: var(--radius);
+      background: var(--surface); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; position: relative;
+    }
+    .screenshot-card img { width: 100%; height: 100%; object-fit: cover; }
+    .screenshot-card .placeholder {
+      color: var(--muted); font-size: 0.8rem; text-align: center; padding: 1rem;
+    }
+
+    /* ── Description ── */
+    .content {
+      max-width: 960px; margin: 3rem auto 0;
+      padding: 0 2rem;
+      display: grid; grid-template-columns: 1fr 280px; gap: 3rem; align-items: start;
+    }
+    .description h2 { font-size: 1rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 1rem; }
+    .description p  { color: #b0ae ab; line-height: 1.7; margin-bottom: 1rem; font-size: 0.95rem; }
+
+    .features { list-style: none; margin: 1.5rem 0; }
+    .features li {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.9rem; line-height: 1.5;
+    }
+    .features li:last-child { border-bottom: none; }
+    .features li::before { content: '→'; color: var(--accent); font-size: 0.8rem; margin-top: 0.15rem; flex-shrink: 0; }
+
+    /* ── Sidebar ── */
+    .sidebar { position: sticky; top: 72px; }
+    .info-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.25rem;
+    }
+    .info-card h3 { font-size: 0.8rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 1rem; }
+    .info-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.55rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .lbl { color: var(--muted); }
+    .info-row .val { font-weight: 500; }
+
+    .platform-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.25rem; }
+    .platform-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.6rem 0.85rem; font-size: 0.85rem;
+    }
+    .platform-name { display: flex; align-items: center; gap: 0.5rem; }
+    .platform-dl {
+      color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.8rem;
+    }
+    .platform-dl:hover { color: var(--accent2); }
+
+    /* ── Footer ── */
+    footer {
+      max-width: 960px; margin: 4rem auto 0; padding: 2rem;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.8rem; color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 700px) {
+      .hero { grid-template-columns: 72px 1fr; gap: 1rem; }
+      .app-icon { width: 72px; height: 72px; font-size: 2rem; }
+      .app-meta h1 { font-size: 1.5rem; }
+      .content { grid-template-columns: 1fr; }
+      .screenshot-grid { grid-template-columns: 1fr 1fr; }
+      .stats { gap: 1.25rem; flex-wrap: wrap; }
+      .sidebar { position: static; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-back" href="/">← Clive</a>
+  <a class="nav-logo" href="/">Clive</a>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="app-icon">🛡</div>
+  <div class="app-meta">
+    <h1>Mahoraga</h1>
+    <p class="tagline">Adaptive Endpoint Defence · by Donington Vale</p>
+    <div class="badges">
+      <span class="badge">Free</span>
+      <span class="badge">v1.0.0</span>
+      <span class="badge neutral">macOS · Windows · Linux</span>
+      <span class="badge neutral">Security</span>
+    </div>
+    <div class="downloads">
+      <a class="dl-btn primary" id="dl-auto" href="#platforms">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download
+      </a>
+      <a class="dl-btn" href="https://github.com/Clutch-tim3/Striker" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.38.6.11.82-.26.82-.58v-2.03c-3.34.72-4.04-1.61-4.04-1.61-.54-1.38-1.33-1.75-1.33-1.75-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 3-.4c1.02 0 2.04.13 3 .4 2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.21.7.82.58C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        Source
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Stats ─────────────────────────────────────────────────────── -->
+<div class="stats">
+  <div class="stat-item"><span class="stat-val">Real-time</span><span class="stat-lbl">Threat Detection</span></div>
+  <div class="stat-item"><span class="stat-val">6 Layers</span><span class="stat-lbl">Sensor Coverage</span></div>
+  <div class="stat-item"><span class="stat-val">9 MITRE ATT&amp;CK</span><span class="stat-lbl">Technique Mappings</span></div>
+  <div class="stat-item"><span class="stat-val">Federated</span><span class="stat-lbl">Model Learning</span></div>
+  <div class="stat-item"><span class="stat-val">0 Subscriptions</span><span class="stat-lbl">Free Forever</span></div>
+</div>
+
+<!-- ── Screenshots ───────────────────────────────────────────────── -->
+<div class="screenshots">
+  <h2>Screenshots</h2>
+  <div class="screenshot-grid">
+    <div class="screenshot-card">
+      <div class="placeholder">Dashboard<br/><span style="font-size:0.7rem;opacity:0.5">screenshot</span></div>
+    </div>
+    <div class="screenshot-card">
+      <div class="placeholder">Threat Feed<br/><span style="font-size:0.7rem;opacity:0.5">screenshot</span></div>
+    </div>
+    <div class="screenshot-card">
+      <div class="placeholder">Threat Map<br/><span style="font-size:0.7rem;opacity:0.5">screenshot</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Body ──────────────────────────────────────────────────────── -->
+<div class="content">
+  <div class="description">
+    <h2>About</h2>
+    <p>
+      Mahoraga is a self-learning endpoint defence system that detects, classifies, and
+      neutralises threats in real time — without signature updates or cloud subscriptions.
+      It runs entirely on your device, monitors six sensor layers simultaneously, and
+      builds its own antibody library from every threat it encounters.
+    </p>
+    <p>
+      Unlike traditional antivirus that relies on known-bad databases, Mahoraga uses
+      an Isolation Forest anomaly model and a behavioural classifier trained on your own
+      machine's telemetry. Every threat it defeats makes it smarter — and through
+      federated learning, insights from the global fleet improve every installation
+      without sharing your data.
+    </p>
+
+    <ul class="features">
+      <li>Process monitoring with platform-specific detection rules for macOS, Windows, and Linux</li>
+      <li>File system watcher covering persistence paths (LaunchAgents, Startup folder, cron.d)</li>
+      <li>Network traffic analysis for C2 beaconing, data exfiltration, and suspicious ports</li>
+      <li>Memory scanner detecting W^X violations and shellcode injection patterns</li>
+      <li>Machine learning anomaly detection — no signature database needed</li>
+      <li>MITRE ATT&CK framework mapping for every detected threat</li>
+      <li>Antibody archive that stores and replays every neutralisation</li>
+      <li>Federated learning — your model improves globally while your data stays local</li>
+      <li>Threat map visualising attack origins in real time on a 3D globe</li>
+    </ul>
+  </div>
+
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+    <div class="info-card">
+      <h3>Info</h3>
+      <div class="info-row"><span class="lbl">Version</span><span class="val">1.0.0</span></div>
+      <div class="info-row"><span class="lbl">Developer</span><span class="val">Donington Vale</span></div>
+      <div class="info-row"><span class="lbl">Category</span><span class="val">Security</span></div>
+      <div class="info-row"><span class="lbl">License</span><span class="val">Free</span></div>
+      <div class="info-row"><span class="lbl">Size</span><span class="val">~120 MB</span></div>
+      <div class="info-row"><span class="lbl">Updated</span><span class="val" id="updated-date">—</span></div>
+    </div>
+
+    <div id="platforms" style="margin-top:1rem;">
+      <div class="platform-list">
+        <div class="platform-row">
+          <span class="platform-name">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            macOS
+          </span>
+          <a class="platform-dl" id="dl-mac" href="#">Download .dmg</a>
+        </div>
+        <div class="platform-row">
+          <span class="platform-name">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+            Windows
+          </span>
+          <a class="platform-dl" id="dl-win" href="#">Download .exe</a>
+        </div>
+        <div class="platform-row">
+          <span class="platform-name">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021C7.309.358 3.932 3.808 3.648 8.144c-.134 2.069.476 4.058 1.666 5.69l.012.016c.218.313.443.602.677.867l-4.186 2.418a1.8 1.8 0 0 0-.615 2.444l3.26 5.648a1.804 1.804 0 0 0 2.445.615l1.748-1.009c.403.121.815.22 1.231.296v2.019a1.8 1.8 0 0 0 1.8 1.8h6.52a1.8 1.8 0 0 0 1.8-1.8v-2.019c.421-.076.836-.175 1.244-.297l1.744 1.007a1.804 1.804 0 0 0 2.445-.615l3.261-5.648a1.804 1.804 0 0 0-.616-2.444l-4.183-2.416c.24-.272.47-.569.694-.89l.012-.016c1.19-1.632 1.8-3.621 1.666-5.69C20.068 3.808 16.69.358 12.504.021A7.698 7.698 0 0 0 12.504 0zm0 2.16c.225 0 .449.01.67.03 3.022.269 5.56 2.758 5.78 5.82.102 1.566-.362 3.08-1.332 4.395l-.012.017a9.61 9.61 0 0 1-.847 1.016l-.562.595 4.578 2.644-3.261 5.648-4.66-2.69-.608.381c-.625.392-1.284.7-1.965.921l-.733.239V24h-6.52v-2.831l-.733-.239a9.638 9.638 0 0 1-1.965-.921l-.608-.381-4.661 2.69-3.26-5.648 4.581-2.645-.562-.595a9.7 9.7 0 0 1-.847-1.017l-.012-.016C4.808 11.07 4.344 9.556 4.446 7.99c.22-3.062 2.758-5.551 5.78-5.82.224-.02.448-.03.672-.03h1.606z"/></svg>
+            Linux
+          </span>
+          <a class="platform-dl" id="dl-linux" href="#">Download .AppImage</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Footer ──────────────────────────────────────────────────────── -->
+<footer>
+  <span>© 2024 Donington Vale</span>
+  <span>
+    <a href="https://github.com/Clutch-tim3/Striker" target="_blank" rel="noopener">GitHub</a>
+    &nbsp;·&nbsp;
+    <a href="/">Clive Marketplace</a>
+  </span>
+</footer>
+
+<script>
+  // ── Detect platform and highlight the right download button ──
+  const ua = navigator.userAgent;
+  const isWin   = ua.includes('Windows');
+  const isMac   = ua.includes('Mac OS');
+  const isLinux = ua.includes('Linux') && !ua.includes('Android');
+
+  const BASE = 'https://firebasestorage.googleapis.com/v0/b/clive-6d22e.appspot.com/o/apps%2Fmahoraga%2F';
+  const VER  = '1.0.0';
+  const Q    = '?alt=media';
+
+  const links = {
+    mac:   `${BASE}v${VER}%2FMahoraga-${VER}.dmg${Q}`,
+    win:   `${BASE}v${VER}%2FMahoraga-Setup-${VER}.exe${Q}`,
+    linux: `${BASE}v${VER}%2FMahoraga-${VER}.AppImage${Q}`,
+  };
+
+  document.getElementById('dl-mac').href   = links.mac;
+  document.getElementById('dl-win').href   = links.win;
+  document.getElementById('dl-linux').href = links.linux;
+
+  const autoBtn = document.getElementById('dl-auto');
+  if (isWin)        { autoBtn.href = links.win;   autoBtn.textContent = '⬇ Download for Windows'; }
+  else if (isMac)   { autoBtn.href = links.mac;   autoBtn.textContent = '⬇ Download for macOS'; }
+  else if (isLinux) { autoBtn.href = links.linux; autoBtn.textContent = '⬇ Download for Linux'; }
+  else              { autoBtn.href = '#platforms'; }
+
+  // ── Updated date ──
+  document.getElementById('updated-date').textContent =
+    new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
+</script>
+</body>
+</html>

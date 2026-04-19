@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 let pythonProcess;
@@ -75,6 +76,29 @@ function createWindow() {
 app.whenReady().then(() => {
   startPythonBackend();
   createWindow();
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
+});
+
+autoUpdater.on('update-available', () => {
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Update available',
+    message: 'A new version of Mahoraga is available. It will download in the background.',
+    buttons: ['OK'],
+  });
+});
+
+autoUpdater.on('update-downloaded', () => {
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Update ready',
+    message: 'Mahoraga has been updated. Restart to apply.',
+    buttons: ['Restart now', 'Later'],
+  }).then(({ response }) => {
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
 });
 
 app.on('window-all-closed', () => {

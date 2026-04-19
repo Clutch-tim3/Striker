@@ -20,6 +20,9 @@
   ],
   "author": "Donington Vale",
   "license": "UNLICENSED",
+  "dependencies": {
+    "electron-updater": "^6.1.7"
+  },
   "devDependencies": {
     "electron": "^28.3.3",
     "electron-builder": "^24.0.0"
@@ -64,6 +67,11 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Clutch-tim3",
+      "repo": "Striker"
     }
   }
 }
