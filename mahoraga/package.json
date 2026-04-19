@@ -4,7 +4,7 @@
   "description": "Mahoraga — Adaptive Cybersecurity EDR by Donington Vale",
   "main": "electron/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "ELECTRON_RUN_AS_NODE= electron .",
     "dev": "bash scripts/dev.sh",
     "build": "bash scripts/build-all.sh",
     "build:python": "bash scripts/build-python.sh",
@@ -21,9 +21,6 @@
   ],
   "author": "Donington Vale",
   "license": "UNLICENSED",
-  "dependencies": {
-    "electron-updater": "^6.1.7"
-  },
   "devDependencies": {
     "electron": "^28.3.3",
     "electron-builder": "^24.0.0"
@@ -74,5 +71,8 @@
       "owner": "Clutch-tim3",
       "repo": "Striker"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
   }
 }
