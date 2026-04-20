@@ -97,24 +97,51 @@ class MahoragaApp:
         self.demo_simulator = ThreatSimulator(self.on_telemetry)
         self.attack_simulator = AttackSimulator(self.on_telemetry)
 
-        # Pre-fit anomaly detector with synthetic baseline so scores are meaningful
+        # Seed anomaly model only if no trained model exists
         self._seed_anomaly_model()
+        # Reload past antibodies into vector index so similarity search works across restarts
+        self._restore_vector_index()
+        # If enough antibodies exist, kick off a retrain immediately rather than waiting for 2 AM
+        threading.Thread(target=self._startup_retrain, daemon=True).start()
 
     def _seed_anomaly_model(self):
-        """Fit isolation forest with synthetic normal baseline so it can score."""
+        """Seed only if no trained model exists — never overwrite real learning."""
         import numpy as np
+        if hasattr(self.anomaly_detector.model, 'estimators_'):
+            logger.info('Anomaly model already trained — skipping synthetic seed')
+            return
         rng = np.random.default_rng(42)
-        # 200 samples of "normal" behaviour
         normal = rng.uniform(0, 1, (200, 8))
-        normal[:, 0] *= 20    # cpu  0-20%
-        normal[:, 1] *= 10    # mem  0-10%
-        normal[:, 2] *= 5     # conn 0-5
+        normal[:, 0] *= 20
+        normal[:, 1] *= 10
+        normal[:, 2] *= 5
         normal[:, 3:] = rng.integers(0, 2, (200, 5))
         try:
             self.anomaly_detector.model.fit(normal)
-            logger.info('Anomaly model seeded with synthetic baseline')
+            logger.info('Anomaly model seeded with synthetic baseline (first run)')
         except Exception as e:
             logger.warning(f'Anomaly model seed failed: {e}')
+
+    def _restore_vector_index(self):
+        """Reload past antibodies into the in-memory vector index on startup."""
+        try:
+            antibodies = self.antibody_store.query({})
+            for ab in antibodies:
+                self.vector_index.add(ab)
+            if antibodies:
+                logger.info(f'Vector index restored with {len(antibodies)} antibodies')
+        except Exception as e:
+            logger.warning(f'Vector index restore failed: {e}')
+
+    def _startup_retrain(self):
+        """Retrain models on startup if enough data exists — don't wait until 2 AM."""
+        try:
+            count = self.antibody_store.count()
+            if count >= 10:
+                logger.info(f'Startup retrain triggered ({count} antibodies)')
+                self.adaptation_scheduler.trigger_now()
+        except Exception as e:
+            logger.warning(f'Startup retrain check failed: {e}')
 
     def start_monitoring(self, payload=None):
         self.process_monitor.start()

@@ -27,6 +27,14 @@ function handleEvent(event) {
     document.getElementById('archive-total').textContent = allAntibodies.length;
     renderArchive(allAntibodies);
   }
+  if (event.type === 'ARCHIVE_ERROR') {
+    const grid = document.getElementById('grid-view');
+    if (grid) grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-state-icon">⚠️</div>
+      <div class="empty-state-title">Archive unavailable</div>
+      <div class="empty-state-sub">${event.data?.message || 'Database error'}</div>
+    </div>`;
+  }
   if (event.type === 'THREAT_NEUTRALISED') {
     window.mahoraga.send('GET_ARCHIVE', {});
   }

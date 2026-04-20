@@ -1,6 +1,7 @@
 import numpy as np
 import json
 from python.core.logger import get_logger
+from python.core.ipc_server import emit
 from python.adaptation.reward_function import RewardFunction
 
 logger = get_logger('trainer')
@@ -30,6 +31,13 @@ class Trainer:
         self._retrain_behaviour_classifier(antibodies)
         self._retrain_anomaly_detector(antibodies)
         logger.info('Adaptation training cycle complete')
+        try:
+            emit('ADAPTATION_UPDATED', {
+                'antibody_count': len(antibodies),
+                'status': 'retrained',
+            })
+        except Exception:
+            pass
 
     def _retrain_behaviour_classifier(self, antibodies: list):
         rows = [(ab, ab.get('attack_type', 'benign')) for ab in antibodies
