@@ -1,6 +1,6 @@
 'use strict';
 
-// ── Target definitions (match Python TARGET_MODULES keys) ─────────────────
+// ── Target definitions ────────────────────────────────────────────────────────
 
 const TARGETS = [
   {
@@ -25,32 +25,68 @@ const TARGETS = [
   },
 ];
 
-// ── State ──────────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 
 let state = {
-  selectedTarget: null,
-  selectedModule: null,
-  currentModules: [],
-  running: false,
-  score: 0,
-  caught: 0,
-  evaded: 0,
-  log: [],
+  selectedTarget:   null,
+  selectedModule:   null,
+  currentModules:   [],
+  running:          false,
+  score:            0,
+  caught:           0,
+  evaded:           0,
+  log:              [],
   completedModules: new Set(),
 };
 
 let _progressInterval = null;
 
-// ── Init ──────────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 
 function sbInit() {
   window.mahoraga.onEvent(handlePythonEvent);
+
+  // ── Event delegation — no inline onclick anywhere ─────────────────────────
+
+  // Target list
+  document.getElementById('sb-target-list').addEventListener('click', function (e) {
+    const card = e.target.closest('[data-target-id]');
+    if (card) sbSelectTarget(card.dataset.targetId);
+  });
+
+  // Module list
+  document.getElementById('sb-module-list').addEventListener('click', function (e) {
+    const card = e.target.closest('[data-module-id]');
+    if (card) sbModuleClick(card.dataset.moduleId);
+  });
+
+  // Reset button
+  const btnReset = document.getElementById('btn-reset');
+  if (btnReset) btnReset.addEventListener('click', sbReset);
+
+  // Result modal — close on overlay click
+  const modal = document.getElementById('sb-result-modal');
+  if (modal) {
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) sbCloseModal();
+    });
+  }
+
+  // Modal buttons (close / next attack)
+  const btnClose = document.getElementById('sb-modal-close');
+  const btnNext  = document.getElementById('sb-modal-next');
+  if (btnClose) btnClose.addEventListener('click', sbCloseModal);
+  if (btnNext)  btnNext.addEventListener('click', function () {
+    sbCloseModal();
+    sbNextAttack();
+  });
+
   renderTargets();
   renderModules();
   renderLog();
 }
 
-// ── Python event router ───────────────────────────────────────────────────
+// ── Python event router ───────────────────────────────────────────────────────
 
 function handlePythonEvent(event) {
   const d = event.data;
@@ -65,10 +101,10 @@ function handlePythonEvent(event) {
   }
 }
 
-// ── Python event handlers ─────────────────────────────────────────────────
+// ── Python event handlers ─────────────────────────────────────────────────────
 
 function onSandboxModules({ modules, target_id }) {
-  if (target_id !== state.selectedTarget) return; // stale response
+  if (target_id !== state.selectedTarget) return;
   state.currentModules = modules || [];
   renderModules();
   sbTerminalPrint([['dim', `${state.currentModules.length} attack modules loaded. Select one to launch.`]]);
@@ -77,7 +113,7 @@ function onSandboxModules({ modules, target_id }) {
 function onAttackStarted(d) {
   sbTerminalPrint([
     ['dim', ''],
-    ['red', `❯ ${d.module_name} launched against ${d.target_id}`],
+    ['red', `> ${d.module_name} launched against ${d.target_id}`],
     ['dim', `  ${d.mitre_id} · ${d.technique}`],
     ['dim', `  ~${d.duration_sec}s runtime · ${d.points} pts at stake`],
   ]);
@@ -94,27 +130,23 @@ function onTerminalLine({ line }) {
 
 function onSandboxDetection(d) {
   const caught = d.result === 'caught';
-  state.caught  = d.stats.caught;
-  state.evaded  = d.stats.evaded;
-  state.score   = d.stats.points;
+  state.caught = d.stats.caught;
+  state.evaded = d.stats.evaded;
+  state.score  = d.stats.points;
   updateScoreUI();
 
   if (caught) {
     sbTerminalPrint([
       ['dim', ''],
-      ['red',    `╔══ MAHORAGA DETECTION ══════════════════`],
-      ['red',    `║  THREAT NEUTRALISED`],
-      ['red',    `║  Severity: ${d.severity}/10  ·  +${d.points} pts scored`],
-      ['red',    `╚════════════════════════════════════════`],
+      ['red', '>> MAHORAGA DETECTION <<<'],
+      ['red', `   THREAT NEUTRALISED — sev ${d.severity}/10 · +${d.points} pts`],
       ['dim', ''],
     ]);
   } else {
     sbTerminalPrint([
       ['dim', ''],
-      ['yellow', `╔══ MAHORAGA SIGNAL ═════════════════════`],
-      ['yellow', `║  Low-confidence signal (sev ${d.severity}/10)`],
-      ['yellow', `║  Below escalation threshold — evaded`],
-      ['yellow', `╚════════════════════════════════════════`],
+      ['yellow', '>> LOW-CONFIDENCE SIGNAL <<<'],
+      ['yellow', `   sev ${d.severity}/10 — below threshold, not escalated`],
       ['dim', ''],
     ]);
   }
@@ -141,7 +173,7 @@ function onAttackComplete(d) {
   state.running = false;
   state.completedModules.add(d.module_id);
   document.getElementById('sb-live-dot').style.opacity = '0.3';
-  sbTerminalPrint([['dim', ''], ['dim', `[Attack complete]`], ['dim', '']]);
+  sbTerminalPrint([['dim', ''], ['dim', '[Attack complete]'], ['dim', '']]);
 
   const mod = state.currentModules.find(m => m.id === d.module_id)
     || { name: d.module_id, mitre_id: '—', technique: '—', points: 0 };
@@ -156,7 +188,7 @@ function onAttackComplete(d) {
   renderModules();
 }
 
-function onSessionReset(d) {
+function onSessionReset() {
   state = {
     selectedTarget: null, selectedModule: null, currentModules: [],
     running: false, score: 0, caught: 0, evaded: 0,
@@ -165,11 +197,11 @@ function onSessionReset(d) {
   updateScoreUI();
   document.getElementById('sb-detect-body').innerHTML =
     '<div class="sb-detect-empty" id="sb-detect-empty">No attacks launched yet.<br>Detection events will appear here.</div>';
-  document.getElementById('sb-terminal-body').innerHTML = `
-    <div class="sb-terminal-welcome">
-      <span class="sb-t-red">mahoraga</span><span class="sb-t-dim">@sandbox</span><span class="sb-t-dim">:~$</span>
-      <span class="sb-t-muted"> Session reset. Select a target to begin.</span><br><br>
-    </div>`;
+  document.getElementById('sb-terminal-body').innerHTML =
+    '<div class="sb-terminal-welcome">' +
+    '<span class="sb-t-red">mahoraga</span><span class="sb-t-dim">@sandbox</span><span class="sb-t-dim">:~$</span>' +
+    ' <span class="sb-t-muted">Session reset. Select a target to begin.</span>' +
+    '</div>';
   document.getElementById('sb-live-dot').style.opacity = '0.3';
   document.getElementById('sb-terminal-title').textContent = 'mahoraga-sandbox — bash';
   const prog = document.getElementById('sb-attack-progress');
@@ -185,13 +217,14 @@ function onSandboxError({ message }) {
   renderModules();
 }
 
-// ── Targets ───────────────────────────────────────────────────────────────
+// ── Targets ───────────────────────────────────────────────────────────────────
+// data-target-id instead of onclick — avoids CSP inline-script block
 
 function renderTargets() {
   const el = document.getElementById('sb-target-list');
   el.innerHTML = TARGETS.map(t => `
     <div class="sb-target${state.selectedTarget === t.id ? ' selected' : ''}"
-         onclick="sbSelectTarget('${t.id}')">
+         data-target-id="${t.id}">
       <div class="sb-target-row">
         <div>
           <div class="sb-target-name">${t.name}</div>
@@ -217,11 +250,11 @@ function sbSelectTarget(id) {
   document.getElementById('sb-terminal-title').textContent = `${t.name} — ${t.ip}`;
   sbTerminalPrint([
     ['dim', ''],
-    ['dim', '─────────────────────────────────────────'],
+    ['dim', '-----------------------------------------'],
     ['bright', `Target: ${t.name} (${t.ip})`],
     ['dim', `OS: ${t.os}  ·  ${t.vulns} vulnerabilities`],
     ['dim', t.desc],
-    ['dim', '─────────────────────────────────────────'],
+    ['dim', '-----------------------------------------'],
     ['dim', 'Loading attack modules...'],
   ]);
 
@@ -231,7 +264,8 @@ function sbSelectTarget(id) {
   window.mahoraga.send('SANDBOX_GET_MODULES', { target_id: id });
 }
 
-// ── Modules ───────────────────────────────────────────────────────────────
+// ── Modules ───────────────────────────────────────────────────────────────────
+// data-module-id instead of onclick
 
 function renderModules() {
   const el = document.getElementById('sb-module-list');
@@ -240,7 +274,7 @@ function renderModules() {
     return;
   }
   if (!state.currentModules.length) {
-    return; // keep loading state until Python responds
+    return;
   }
   el.innerHTML = state.currentModules.map(m => {
     const done     = state.completedModules.has(m.id);
@@ -248,7 +282,7 @@ function renderModules() {
     const disabled = state.running;
     return `
       <div class="sb-module${done ? ' done' : ''}${selected ? ' selected' : ''}${disabled ? ' disabled' : ''}"
-           onclick="sbModuleClick('${m.id}')">
+           data-module-id="${m.id}">
         <div class="sb-module-title">
           <span>${m.name}</span>
           <span class="sb-module-badge sb-badge-${m.difficulty}">${m.difficulty}</span>
@@ -259,8 +293,8 @@ function renderModules() {
           <span class="sb-module-dur">~${m.duration_sec}s</span>
           <span style="margin-left:auto;font-size:10px;font-weight:700;color:var(--text-3)">+${m.points} pts</span>
         </div>
-        ${selected && !done && !disabled ? '<div class="sb-module-launch-hint">▶ Click again to launch</div>' : ''}
-        <div class="sb-module-tick">✓</div>
+        ${selected && !done && !disabled ? '<div class="sb-module-launch-hint">Click again to launch &#9654;</div>' : ''}
+        <div class="sb-module-tick">&#10003;</div>
       </div>
     `;
   }).join('');
@@ -269,7 +303,6 @@ function renderModules() {
 function sbModuleClick(moduleId) {
   if (state.running) return;
   if (state.selectedModule === moduleId) {
-    // Second click → launch
     _doLaunch(moduleId);
   } else {
     state.selectedModule = moduleId;
@@ -284,14 +317,11 @@ function _doLaunch(moduleId) {
 
   state.running = true;
   renderModules();
-
-  sbTerminalPrint([['dim', ''], ['red', `❯ Launching: ${mod.name}`]]);
-
-  window.mahoraga.send('SANDBOX_LAUNCH', {
-    module_id: moduleId,
-    target_id: state.selectedTarget,
-  });
+  sbTerminalPrint([['dim', ''], ['red', `> Launching: ${mod.name}`]]);
+  window.mahoraga.send('SANDBOX_LAUNCH', { module_id: moduleId, target_id: state.selectedTarget });
 }
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
 
 function startProgressBar(durationSec) {
   const progressEl   = document.getElementById('sb-attack-progress');
@@ -318,7 +348,7 @@ function startProgressBar(durationSec) {
   }, 200);
 }
 
-// ── Terminal ──────────────────────────────────────────────────────────────
+// ── Terminal ──────────────────────────────────────────────────────────────────
 
 function sbTerminalPrint(lines) {
   const body = document.getElementById('sb-terminal-body');
@@ -336,7 +366,7 @@ function sbTerminalPrint(lines) {
   body.scrollTop = body.scrollHeight;
 }
 
-// ── Detection feed ────────────────────────────────────────────────────────
+// ── Detection feed ────────────────────────────────────────────────────────────
 
 function sbAddDetectionEvent({ caught, label, severity, points }) {
   const body  = document.getElementById('sb-detect-body');
@@ -344,18 +374,26 @@ function sbAddDetectionEvent({ caught, label, severity, points }) {
   if (empty) empty.style.display = 'none';
 
   const ev = document.createElement('div');
-  ev.className = `sb-detect-event ${caught ? 'caught' : 'evaded'}`;
-  ev.innerHTML = `
-    <div class="sb-de-top">
-      <span class="sb-de-event">${label}</span>
-      <span class="sb-de-verdict ${caught ? 'caught' : 'evaded'}">${caught ? 'DETECTED' : 'EVADED'}</span>
-    </div>
-    <div class="sb-de-detail">sev=${severity}${caught ? ` · +${points} pts` : ''}</div>
-  `;
+  ev.className = 'sb-detect-event ' + (caught ? 'caught' : 'evaded');
+  const top    = document.createElement('div');
+  top.className = 'sb-de-top';
+  const nameEl   = document.createElement('span');
+  nameEl.className = 'sb-de-event';
+  nameEl.textContent = label;
+  const verdictEl  = document.createElement('span');
+  verdictEl.className = 'sb-de-verdict ' + (caught ? 'caught' : 'evaded');
+  verdictEl.textContent = caught ? 'DETECTED' : 'EVADED';
+  top.appendChild(nameEl);
+  top.appendChild(verdictEl);
+  const detail = document.createElement('div');
+  detail.className = 'sb-de-detail';
+  detail.textContent = 'sev=' + severity + (caught ? ' · +' + points + ' pts' : '');
+  ev.appendChild(top);
+  ev.appendChild(detail);
   body.insertBefore(ev, body.firstChild);
 }
 
-// ── Result modal ──────────────────────────────────────────────────────────
+// ── Result modal ──────────────────────────────────────────────────────────────
 
 function showResultModal(mod, stats) {
   const top     = document.getElementById('sb-result-top');
@@ -366,26 +404,33 @@ function showResultModal(mod, stats) {
 
   const didCatch = stats.caught > 0;
   top.className       = 'sb-result-top ' + (didCatch ? 'detected' : 'evaded');
-  icon.textContent    = didCatch ? '🛡' : '💀';
+  icon.textContent    = didCatch ? '\uD83D\uDEE1' : '\uD83D\uDC80';
   verdict.textContent = didCatch ? 'Detected' : 'Evaded';
   sub.textContent     = didCatch
     ? 'Mahoraga caught the attack before it completed.'
     : "Attack succeeded — Mahoraga missed this one. It's adapting now.";
 
-  rows.innerHTML = `
-    <div class="sb-result-row"><span class="lbl">Attack</span><span class="val">${mod.name}</span></div>
-    <div class="sb-result-row"><span class="lbl">MITRE</span><span class="val mono">${mod.mitre_id || '—'}</span></div>
-    <div class="sb-result-row"><span class="lbl">Technique</span><span class="val">${mod.technique || '—'}</span></div>
-    <div class="sb-result-row"><span class="lbl">Caught</span><span class="val">${stats.caught}</span></div>
-    <div class="sb-result-row"><span class="lbl">Evaded</span><span class="val">${stats.evaded}</span></div>
-    <div class="sb-result-row"><span class="lbl">Total points</span><span class="val" style="color:var(--red)">⚡ ${stats.points}</span></div>
-  `;
+  const makeRow = (lbl, val, style) => {
+    const row = document.createElement('div');
+    row.className = 'sb-result-row';
+    const l = document.createElement('span'); l.className = 'lbl'; l.textContent = lbl;
+    const v = document.createElement('span'); v.className = 'val'; v.textContent = val;
+    if (style) v.setAttribute('style', style);
+    row.appendChild(l); row.appendChild(v);
+    return row;
+  };
+  rows.innerHTML = '';
+  rows.appendChild(makeRow('Attack',      mod.name));
+  rows.appendChild(makeRow('MITRE',       mod.mitre_id || '—'));
+  rows.appendChild(makeRow('Technique',   mod.technique || '—'));
+  rows.appendChild(makeRow('Caught',      stats.caught));
+  rows.appendChild(makeRow('Evaded',      stats.evaded));
+  rows.appendChild(makeRow('Total points', '\u26A1 ' + stats.points, 'color:var(--red)'));
 
   document.getElementById('sb-result-modal').style.display = 'flex';
 }
 
-function sbCloseModal(e) {
-  if (e && e.target !== document.getElementById('sb-result-modal')) return;
+function sbCloseModal() {
   document.getElementById('sb-result-modal').style.display = 'none';
 }
 
@@ -393,7 +438,7 @@ function sbNextAttack() {
   document.getElementById('sb-module-list').scrollIntoView({ behavior: 'smooth' });
 }
 
-// ── Score UI ──────────────────────────────────────────────────────────────
+// ── Score UI ──────────────────────────────────────────────────────────────────
 
 function updateScoreUI() {
   document.getElementById('sb-score').textContent  = state.score;
@@ -401,7 +446,7 @@ function updateScoreUI() {
   document.getElementById('sb-evaded').textContent = state.evaded;
 }
 
-// ── Session log ───────────────────────────────────────────────────────────
+// ── Session log ───────────────────────────────────────────────────────────────
 
 function renderLog() {
   const el = document.getElementById('sb-log');
@@ -414,19 +459,19 @@ function renderLog() {
       <span class="sb-log-name">${e.name}</span>
       <div class="sb-log-right">
         <span class="sb-log-result ${e.caught ? 'caught' : 'evaded'}">${e.caught ? 'detected' : 'evaded'}</span>
-        <span class="sb-log-pts">⚡ ${e.pts}</span>
+        <span class="sb-log-pts">\u26A1 ${e.pts}</span>
       </div>
     </div>
   `).join('');
 }
 
-// ── Reset ─────────────────────────────────────────────────────────────────
+// ── Reset ─────────────────────────────────────────────────────────────────────
 
 function sbReset() {
   if (state.running) return;
   window.mahoraga.send('SANDBOX_RESET', {});
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────
+// ── Boot ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', sbInit);

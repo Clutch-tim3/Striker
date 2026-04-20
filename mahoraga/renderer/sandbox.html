@@ -111,7 +111,7 @@
             <span id="sb-score">0</span>
             <span style="color:var(--text-3);font-weight:400"> pts</span>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-reset" onclick="sbReset()">Reset Session</button>
+          <button class="btn btn-secondary btn-sm" id="btn-reset">Reset Session</button>
         </div>
       </div>
 
@@ -196,7 +196,7 @@
 </div>
 
 <!-- Attack result modal -->
-<div class="modal-overlay" id="sb-result-modal" style="display:none" onclick="sbCloseModal(event)">
+<div class="modal-overlay" id="sb-result-modal" style="display:none">
   <div class="modal sb-result-inner">
     <div class="sb-result-top" id="sb-result-top">
       <div class="sb-result-icon" id="sb-result-icon">🛡</div>
@@ -205,8 +205,8 @@
     </div>
     <div class="sb-result-rows" id="sb-result-rows"></div>
     <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-      <button class="btn btn-secondary btn-sm" onclick="sbCloseModal()">Close</button>
-      <button class="btn btn-sm" style="background:var(--black);color:var(--white)" onclick="sbCloseModal();sbNextAttack()">Next Attack →</button>
+      <button class="btn btn-secondary btn-sm" id="sb-modal-close">Close</button>
+      <button class="btn btn-sm" id="sb-modal-next" style="background:var(--black);color:var(--white)">Next Attack &rarr;</button>
     </div>
   </div>
 </div>
