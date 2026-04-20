@@ -1,0 +1,9 @@
+{
+  "hosting": {
+    "public": "deploy/public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/apps/mahoraga", "destination": "/apps/mahoraga/index.html" }
+    ]
+  }
+}

@@ -38,9 +38,10 @@ class AntibodyStore:
             'vector_json':    self._safe_json(telemetry),
             'detection_ms':   0,
             'neutralised_ms': 0,
-            'source':         telemetry.get('source', 'unknown'),
-            'platform':       platform.system(),
-            'insights_json':  self._safe_json(insights) if insights else None,
+            'source':              telemetry.get('source', 'unknown'),
+            'platform':            platform.system(),
+            'insights_json':       self._safe_json(insights) if insights else None,
+            'offensive_unlocked':  0,
         }
 
         try:
@@ -49,7 +50,7 @@ class AntibodyStore:
                     :id, :created_at, :attack_type, :mitre_id, :mitre_name,
                     :severity, :anomaly_score, :telemetry_json, :response_json,
                     :vector_json, :detection_ms, :neutralised_ms, :source, :platform,
-                    :insights_json
+                    :insights_json, :offensive_unlocked
                 )
             """, antibody)
             self.db.commit()

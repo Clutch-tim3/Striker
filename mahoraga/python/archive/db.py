@@ -17,11 +17,12 @@ CREATE TABLE IF NOT EXISTS antibodies (
     telemetry_json  TEXT,
     response_json   TEXT,
     vector_json     TEXT,
-    detection_ms    INTEGER,
-    neutralised_ms  INTEGER,
-    source          TEXT,
-    platform        TEXT,
-    insights_json   TEXT
+    detection_ms        INTEGER,
+    neutralised_ms      INTEGER,
+    source              TEXT,
+    platform            TEXT,
+    insights_json       TEXT,
+    offensive_unlocked  INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_attack_type ON antibodies(attack_type);
@@ -41,11 +42,15 @@ class Database:
         logger.info(f'Database ready at {DB_PATH}')
 
     def _migrate(self):
-        try:
-            self.conn.execute('ALTER TABLE antibodies ADD COLUMN insights_json TEXT')
-            self.conn.commit()
-        except sqlite3.OperationalError:
-            pass
+        for ddl in [
+            'ALTER TABLE antibodies ADD COLUMN insights_json TEXT',
+            'ALTER TABLE antibodies ADD COLUMN offensive_unlocked INTEGER DEFAULT 0',
+        ]:
+            try:
+                self.conn.execute(ddl)
+                self.conn.commit()
+            except sqlite3.OperationalError:
+                pass
 
     def execute(self, sql: str, params=()) -> sqlite3.Cursor:
         return self.conn.execute(sql, params)

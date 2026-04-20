@@ -12,7 +12,7 @@ function init() {
 
   window.mahoraga.onEvent(handleEvent);
   window.mahoraga.send('GET_CONFIG');
-  window.mahoraga.send('GET_ARCHIVE', { limit: 1 });
+  window.mahoraga.send('GET_ARCHIVE_STATS', {});
 }
 
 function handleEvent(event) {
@@ -37,14 +37,18 @@ function handleEvent(event) {
       onThreatNeutralised(event.data);
       break;
 
-    case 'ARCHIVE_DATA':
-      antibodyCount = event.data.antibodies ? event.data.antibodies.length : 0;
+    case 'ARCHIVE_STATS':
+      antibodyCount = event.data.total || 0;
       document.getElementById('antibody-count').textContent = antibodyCount;
       const archiveBadge = document.getElementById('archive-count');
-      if (antibodyCount > 0) {
+      if (archiveBadge && antibodyCount > 0) {
         archiveBadge.textContent = antibodyCount;
         archiveBadge.style.display = 'inline-block';
       }
+      break;
+
+    case 'THREAT_ANALYSIS_READY':
+      if (typeof onAnalysisReady === 'function') onAnalysisReady(event.data);
       break;
 
     case 'CONFIG_DATA':
@@ -82,13 +86,19 @@ function onThreatNeutralised(data) {
   antibodyCount++;
   document.getElementById('antibody-count').textContent = antibodyCount;
 
+  const archiveBadge = document.getElementById('archive-count');
+  if (archiveBadge) {
+    archiveBadge.textContent = antibodyCount;
+    archiveBadge.style.display = 'inline-block';
+  }
+
   adaptationScore = Math.min(99, adaptationScore + 0.5);
   renderAdaptationArc(Math.round(adaptationScore));
   document.getElementById('model-score').textContent = Math.round(adaptationScore);
 
-  // Attach insights to the most recently added feed entry for this attack type
-  if (data.insights && data.threat_id) {
-    attachInsightsToFeed(data.threat_id, data.insights, data.antibody_id);
+  // Wire antibody_id to feed entry + modal so THREAT_ANALYSIS_READY can resolve
+  if (data.threat_id && data.antibody_id) {
+    attachInsightsToFeed(data.threat_id, null, data.antibody_id);
   }
 }
 

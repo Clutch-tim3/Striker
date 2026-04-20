@@ -1,6 +1,8 @@
 let allAntibodies = [];
 let currentView = 'grid';
 
+const OFFENSIVE_UNLOCKED = sessionStorage.getItem('mahoraga_offensive') === '1';
+
 const ATTACK_LABELS = {
   ransomware:'Ransomware', keylogger:'Keylogger', rootkit:'Rootkit',
   c2_beacon:'C2 Beacon', data_exfil:'Data Exfiltration',
@@ -26,8 +28,15 @@ function handleEvent(event) {
     renderArchive(allAntibodies);
   }
   if (event.type === 'THREAT_NEUTRALISED') {
-    // Refresh archive when a new antibody is created
     window.mahoraga.send('GET_ARCHIVE', {});
+  }
+  if (event.type === 'OFFENSIVE_UNLOCKED') {
+    if (event.data.ok) {
+      sessionStorage.setItem('mahoraga_offensive', '1');
+      location.reload();
+    } else {
+      alert('Invalid key.');
+    }
   }
 }
 
@@ -205,7 +214,29 @@ function showAntibodyModal(abJson) {
 
 function buildAntibodyInsights(ab) {
   const ins = tryParseJSON(ab.insights_json);
-  if (!ins) return '';
+  const offensiveData = OFFENSIVE_UNLOCKED && ab.offensive_unlocked;
+
+  const offensiveSection = offensiveData
+    ? `
+      <div class="insight-block insight-offensive">
+        <div class="insight-block-header">
+          <span class="insight-block-icon">⚔️</span>
+          <span class="insight-block-title">Offensive Context</span>
+        </div>
+        ${ins ? `<p class="insight-body">${ins.offensive}</p>` : ''}
+        <div class="label" style="margin-top:12px">Raw Telemetry</div>
+        <pre class="mono" style="font-size:10px;overflow:auto;max-height:200px;color:var(--text-1)">${JSON.stringify(tryParseJSON(ab.telemetry_json) || {}, null, 2)}</pre>
+      </div>`
+    : `
+      <div style="padding:16px 0">
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.1em">🔒 OFFENSIVE DATA LOCKED</div>
+        <p style="font-family:'Libre Baskerville',serif;font-style:italic;font-size:12px;color:rgba(255,255,255,0.2);margin-top:6px">
+          Contact support@clive.dev to unlock offensive intelligence access.
+        </p>
+      </div>`;
+
+  if (!ins) return offensiveSection;
+
   return `
     <div class="insight-sections" style="margin-top:20px">
       <div class="insight-block insight-learned">
@@ -229,13 +260,7 @@ function buildAntibodyInsights(ab) {
         </div>
         <p class="insight-body">${ins.defensive}</p>
       </div>
-      <div class="insight-block insight-offensive">
-        <div class="insight-block-header">
-          <span class="insight-block-icon">⚔️</span>
-          <span class="insight-block-title">Offensive Context</span>
-        </div>
-        <p class="insight-body">${ins.offensive}</p>
-      </div>
+      ${offensiveSection}
     </div>`;
 }
 

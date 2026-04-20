@@ -81,9 +81,13 @@ function attachInsightsToFeed(threatId, insights, antibodyId) {
   t._insights = insights;
   t._antibodyId = antibodyId;
   entry.dataset.threat = JSON.stringify(t);
-  if (currentThreat && currentThreat.threat_id === threatId && !currentThreat._insights) {
+  const modal = document.getElementById('threat-modal');
+  if (modal && modal.style.display !== 'none') {
+    modal.dataset.antibodyId = antibodyId;
+  }
+  if (currentThreat && currentThreat.threat_id === threatId) {
     currentThreat = t;
-    renderModalInsights(insights, antibodyId);
+    if (insights) renderModalInsights(insights, antibodyId);
   }
 }
 
@@ -161,9 +165,27 @@ function renderModalInsights(insights, antibodyId) {
 
 function buildPendingInsights() {
   return `
-    <div class="insight-pending">
-      <div class="insight-pending-dot"></div>
-      Generating analysis…
+    <div class="insight-pending" id="modal-analysis-pending">
+      <div class="insight-pending-dot" id="modal-analysis-dot"></div>
+      <span id="modal-analysis-label">Generating analysis…</span>
+    </div>`;
+}
+
+function onAnalysisReady(data) {
+  const modal = document.getElementById('threat-modal');
+  if (!modal || modal.style.display === 'none') return;
+  if (modal.dataset.antibodyId !== data.antibody_id) return;
+  const pending = document.getElementById('modal-analysis-pending');
+  if (!pending) return;
+  const container = document.getElementById('modal-insights');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="insight-block insight-learned">
+      <div class="insight-block-header">
+        <span class="insight-block-icon">🧠</span>
+        <span class="insight-block-title">Threat Analysis</span>
+      </div>
+      <p class="insight-body">${data.analysis}</p>
     </div>`;
 }
 

@@ -58,7 +58,8 @@ class CommandRouter:
             'ISOLATE_NETWORK':  self.app.isolate_network,
             'GET_CONFIG':       self.app.get_config,
             'SET_CONFIG':       self.app.set_config,
-            'ACTIVATE_LICENSE': self.app.activate_license,
+            'ACTIVATE_LICENSE':  self.app.activate_license,
+            'UNLOCK_OFFENSIVE':  self.app.unlock_offensive,
         }
         handler = handlers.get(command)
         if handler:
@@ -171,22 +172,31 @@ class MahoragaApp:
                 logger.error(f'Watchdog error: {e}')
 
     def on_telemetry(self, telemetry: dict):
-        if not self.config.get('anomaly_enabled', True):
-            return
+        # ── LAYER 2: DETECT ──────────────────────────────────────────────────
+        try:
+            anomaly_score = self.anomaly_detector.score(telemetry)
+        except Exception as e:
+            logger.error(f'Anomaly score failed: {e}')
+            anomaly_score = 0.0
 
-        # ── LAYER 2: DETECT ────────────────────────────────────────────
-        anomaly_score = self.anomaly_detector.score(telemetry) if self.config.get('anomaly_enabled', True) else 0.0
-        behaviour_hit = self.behaviour_classifier.classify(telemetry) if self.config.get('behaviour_enabled', True) else None
-        heuristic_hit = self.heuristics.check(telemetry) if self.config.get('heuristics_enabled', True) else False
+        try:
+            behaviour_hit = self.behaviour_classifier.classify(telemetry)
+        except Exception as e:
+            logger.error(f'Behaviour classify failed: {e}')
+            behaviour_hit = None
 
-        # Vector similarity catch — known pattern = guaranteed detection
-        similar = self.vector_index.find_similar(telemetry, top_k=1)
-        similarity_hit = bool(similar)
+        try:
+            heuristic_hit = self.heuristics.check(telemetry)
+        except Exception as e:
+            logger.error(f'Heuristics failed: {e}')
+            heuristic_hit = False
 
-        threshold = self.config.get('anomaly_threshold', 0.75)
+        similar = []
+        try:
+            similar = self.vector_index.find_similar(telemetry, top_k=1)
+        except Exception:
+            pass
 
-        # Guaranteed floor — any sensor that explicitly flagged a high-severity
-        # event or attack hint CANNOT be filtered out by the ML threshold.
         sensor_flagged = (
             telemetry.get('severity_hint', 0) >= 7 or
             bool(telemetry.get('attack_hint')) or
@@ -201,24 +211,39 @@ class MahoragaApp:
             })
         )
 
+        threshold = self.config.get('anomaly_threshold', 0.6)
         is_threat = (
             anomaly_score > threshold or
             bool(behaviour_hit) or
             heuristic_hit or
-            similarity_hit or
+            bool(similar) or
             sensor_flagged
         )
         if not is_threat:
             return
 
-        # ── LAYER 3: ANALYSE ───────────────────────────────────────────
-        attack_type = behaviour_hit or self.attack_classifier.classify(telemetry)
-        mitre_id = self.mitre_tagger.tag(telemetry, attack_type)
-        telemetry['attack_type'] = attack_type
-        severity = self.severity_scorer.score(telemetry, anomaly_score)
+        # ── LAYER 3: ANALYSE ─────────────────────────────────────────────────
+        try:
+            attack_type = behaviour_hit or self.attack_classifier.classify(telemetry) or 'unknown'
+        except Exception as e:
+            logger.error(f'Attack classify failed: {e}')
+            attack_type = telemetry.get('attack_hint', 'unknown') or 'unknown'
 
+        try:
+            mitre_id = self.mitre_tagger.tag(telemetry, attack_type)
+        except Exception as e:
+            logger.error(f'MITRE tag failed: {e}')
+            mitre_id = {'technique_id': 'T0000', 'technique_name': 'Unknown'}
+
+        try:
+            severity = self.severity_scorer.score(telemetry, anomaly_score)
+        except Exception as e:
+            logger.error(f'Severity score failed: {e}')
+            severity = max(int(telemetry.get('severity_hint', 0)), 5)
+
+        threat_id = str(uuid.uuid4())
         threat = {
-            'threat_id':     str(uuid.uuid4()),
+            'threat_id':     threat_id,
             'telemetry':     telemetry,
             'anomaly_score': anomaly_score,
             'attack_type':   attack_type,
@@ -227,52 +252,103 @@ class MahoragaApp:
             'similar_past':  similar,
         }
 
-        emit('THREAT_DETECTED', threat)
+        emit('THREAT_DETECTED', {
+            'threat_id':     threat_id,
+            'attack_type':   attack_type,
+            'severity':      severity,
+            'anomaly_score': anomaly_score,
+            'mitre_id':      mitre_id,
+            'similar_past':  similar,
+            'telemetry':     telemetry,
+        })
 
-        # Notify sandbox simulator if a session is active
-        if self.attack_simulator.running:
-            self.attack_simulator.on_detection(threat)
+        # ── LAYER 4: RESPOND ─────────────────────────────────────────────────
+        response_taken = []
+        try:
+            response_taken = self.auto_respond(threat)
+        except Exception as e:
+            logger.error(f'auto_respond failed: {e}')
+            response_taken = ['RESPONSE_FAILED']
 
-        # ── LAYER 4: RESPOND ───────────────────────────────────────────
-        response_taken = self.auto_respond(threat)
+        # ── LAYER 5: ARCHIVE ─────────────────────────────────────────────────
+        antibody = None
+        try:
+            antibody = self.antibody_store.create(threat, response_taken)
+            self.vector_index.add(antibody)
+        except Exception as e:
+            logger.error(f'Antibody creation failed: {e}')
 
-        # ── LAYER 5: ARCHIVE ───────────────────────────────────────────
-        antibody = self.antibody_store.create(threat, response_taken)
-        self.vector_index.add(antibody)
+        # Notify sandbox simulator if active
+        try:
+            if self.attack_simulator.running:
+                self.attack_simulator.on_detection(threat)
+        except Exception:
+            pass
 
-        # ── LAYER 6: INSIGHT ───────────────────────────────────────────
-        insights = generate_insights(threat, antibody, response_taken)
-        self.antibody_store.update_insights(antibody['id'], insights)
+        if not antibody:
+            return
 
         emit('THREAT_NEUTRALISED', {
             'antibody_id': antibody['id'],
-            'threat_id':   threat['threat_id'],
+            'threat_id':   threat_id,
+            'attack_type': attack_type,
             'response':    response_taken,
             'severity':    severity,
-            'insights':    insights,
-            'threat_ref':  threat,
         })
 
+        # ── LAYER 6: INSIGHT (non-blocking) ──────────────────────────────────
+        def _run_insights():
+            try:
+                from python.analysis.threat_analyser import emit_analysis
+                emit_analysis(antibody['id'], threat, antibody)
+            except Exception as e:
+                logger.error(f'emit_analysis failed: {e}')
+            try:
+                ins = generate_insights(threat, antibody, response_taken)
+                self.antibody_store.update_insights(antibody['id'], ins)
+            except Exception as e:
+                logger.error(f'generate_insights failed: {e}')
+
+        threading.Thread(target=_run_insights, daemon=True).start()
+
     def auto_respond(self, threat: dict) -> list:
-        severity = threat['severity']
-        telemetry = threat['telemetry']
-        threshold = self.config.get('auto_kill_threshold', 8)
-        actions = []
+        severity    = threat.get('severity', 0)
+        telemetry   = threat.get('telemetry', {})
+        attack_type = threat.get('attack_type', 'unknown')
+        threshold   = self.config.get('auto_kill_threshold', 8)
+        actions     = []
 
         if severity >= threshold:
-            if pid := telemetry.get('pid'):
-                if self.process_killer.kill(int(pid)):
-                    actions.append('PROCESS_KILLED')
-            if self.config.get('auto_quarantine', True):
-                if path := telemetry.get('file_path'):
-                    if self.quarantine.quarantine(path):
+            pid = telemetry.get('pid')
+            if pid:
+                try:
+                    if self.process_killer.kill(int(pid)):
+                        actions.append('PROCESS_KILLED')
+                except Exception as e:
+                    logger.warning(f'Process kill failed (pid {pid}): {e}')
+                    actions.append('PROCESS_KILL_FAILED')
+
+            file_path = telemetry.get('file_path')
+            if file_path and self.config.get('auto_quarantine', True):
+                try:
+                    if self.quarantine.quarantine(file_path):
                         actions.append('FILE_QUARANTINED')
+                except Exception as e:
+                    logger.warning(f'Quarantine failed ({file_path}): {e}')
+                    actions.append('QUARANTINE_FAILED')
 
         if (self.config.get('auto_isolate', False) and
-                severity >= 6 and
-                threat['attack_type'] in ('ransomware', 'c2_beacon', 'data_exfil')):
-            if self.network_isolator.isolate():
-                actions.append('NETWORK_ISOLATED')
+                severity >= 7 and
+                attack_type in ('ransomware', 'c2_beacon', 'data_exfil')):
+            try:
+                if self.network_isolator.isolate():
+                    actions.append('NETWORK_ISOLATED')
+            except Exception as e:
+                logger.warning(f'Network isolate failed: {e}')
+                actions.append('ISOLATION_FAILED')
+
+        if not actions:
+            actions.append('LOGGED')
 
         return actions
 
@@ -332,13 +408,18 @@ class MahoragaApp:
 
     def activate_license(self, payload: dict):
         key = payload.get('key', '')
-        # Validate against Clive license server
-        # POST https://clive.dev/api/subscriptions/validate { apiKey: key }
         valid = key.startswith('clive_') and len(key) > 20
         if valid:
             self.config.update({'tier': 'pro', 'license_key': key})
             self.config.save()
         emit('LICENSE_RESULT', {'valid': valid, 'tier': 'pro' if valid else 'free'})
+
+    def unlock_offensive(self, payload: dict):
+        import os
+        provided = payload.get('key', '')
+        expected = os.environ.get('MAHORAGA_OFFENSIVE_KEY', '')
+        ok = bool(expected and provided == expected)
+        emit('OFFENSIVE_UNLOCKED', {'ok': ok})
 
 
 if __name__ == '__main__':

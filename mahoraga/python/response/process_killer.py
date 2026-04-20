@@ -1,10 +1,9 @@
-import signal
 import os
+import psutil
 from python.core.logger import get_logger
 
 logger = get_logger('process_killer')
 
-# PIDs we must never kill
 PROTECTED_PIDS = {1, os.getpid()}
 
 
@@ -14,15 +13,20 @@ class ProcessKiller:
             logger.warning(f'Refused to kill protected PID {pid}')
             return False
         try:
-            import psutil
             proc = psutil.Process(pid)
             proc.terminate()
             try:
                 proc.wait(timeout=3)
             except psutil.TimeoutExpired:
                 proc.kill()
-            logger.info(f'Killed process PID {pid}')
+            logger.info(f'Process {pid} terminated')
             return True
+        except psutil.NoSuchProcess:
+            logger.warning(f'Process {pid} already gone')
+            return False
+        except psutil.AccessDenied:
+            logger.warning(f'Access denied killing pid {pid}')
+            return False
         except Exception as e:
-            logger.error(f'Failed to kill PID {pid}: {e}')
+            logger.error(f'Kill pid {pid} failed: {e}')
             return False
