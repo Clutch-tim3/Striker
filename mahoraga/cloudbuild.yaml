@@ -1,11 +1,6 @@
 steps:
   - name: 'node:20-slim'
-    id: deploy-static
-    entrypoint: bash
-    args:
-      - '-c'
-      - |
-        npm install -g firebase-tools --quiet
-        firebase deploy --only hosting --project clive-6d22e
+    entrypoint: node
+    args: ['--check', 'server.js']
 
-timeout: 120s
+timeout: 60s
