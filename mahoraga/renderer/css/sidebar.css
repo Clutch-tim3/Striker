@@ -215,3 +215,12 @@
   margin-top: 6px;
   letter-spacing: 0.01em;
 }
+
+/* Offense lock icon in sidebar */
+.nav-lock-icon {
+  width: 13px;
+  height: 13px;
+  margin-left: auto;
+  color: rgba(255,255,255,0.25);
+  flex-shrink: 0;
+}

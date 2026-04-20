@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com;
+             font-src 'self' https://fonts.gstatic.com;
+             script-src 'self';
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;">
+  <title>Offense — Mahoraga</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/offense.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">M</div>
+      <div>
+        <div class="logo-text">Mahoraga</div>
+        <div class="logo-sub">EDR · v1.0</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Monitor</div>
+      <a class="nav-item" href="index.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="2" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="2" width="7" height="7" rx="1.5"/>
+          <rect x="2" y="11" width="7" height="7" rx="1.5"/>
+          <rect x="11" y="11" width="7" height="7" rx="1.5"/>
+        </svg>
+        Dashboard
+      </a>
+      <a class="nav-item" href="archive.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v1H3V5z"/>
+          <path d="M3 6h14v10a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/>
+          <path d="M8 10h4M8 13h2"/>
+        </svg>
+        Antibody Archive
+      </a>
+      <div class="nav-section-label">Intel</div>
+      <a class="nav-item" href="map.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="8"/>
+          <path d="M2 10h16M10 2a14 14 0 000 16M10 2a14 14 0 010 16"/>
+        </svg>
+        Threat Map
+      </a>
+      <a class="nav-item active" href="offense.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M10 2l2.5 5 5.5.8-4 3.9.9 5.5L10 14.5l-4.9 2.7.9-5.5L2 7.8l5.5-.8z"/>
+        </svg>
+        Offense
+        <svg class="nav-lock-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="2.5" y="6" width="9" height="7" rx="1.5"/>
+          <path d="M4.5 6V4.5a2.5 2.5 0 015 0V6"/>
+        </svg>
+      </a>
+      <div class="nav-section-label">Lab</div>
+      <a class="nav-item" href="sandbox.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M7 3v6l-3 6h12l-3-6V3"/>
+          <path d="M7 3h6"/>
+          <circle cx="10" cy="14" r="1" fill="currentColor" stroke="none"/>
+        </svg>
+        Sandbox
+        <span class="nav-version-tag">Beta</span>
+      </a>
+      <div class="nav-section-label">Config</div>
+      <a class="nav-item" href="settings.html">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="10" cy="10" r="3"/>
+          <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/>
+        </svg>
+        Settings
+      </a>
+    </nav>
+    <div class="sidebar-status">
+      <div class="status-indicator">
+        <div class="status-dot" id="status-dot"></div>
+        <div class="status-label">Status: <strong id="status-text">Active</strong></div>
+      </div>
+      <div class="sidebar-tier" style="margin-top:8px">
+        <span class="tier-badge free">Free</span>
+        <span class="sidebar-footer-note">Donington Vale</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- ── LOCKED GATE ─────────────────────────────────── -->
+    <div class="off-gate" id="off-gate">
+      <div class="off-gate-inner">
+        <div class="off-gate-lock" id="off-gate-lock">
+          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="8" y="22" width="32" height="22" rx="4"/>
+            <path d="M14 22V16a10 10 0 0120 0v6"/>
+            <circle cx="24" cy="33" r="3" fill="currentColor" stroke="none"/>
+          </svg>
+        </div>
+        <div class="off-gate-tag">RESTRICTED ACCESS</div>
+        <h1 class="off-gate-title">Offensive Intelligence</h1>
+        <p class="off-gate-sub">
+          This module contains classified offensive methodologies extracted from
+          neutralised attacks. Access is restricted to authorised administrators only.
+        </p>
+        <div class="off-gate-form" id="off-gate-form">
+          <input
+            type="password"
+            id="off-gate-input"
+            class="off-gate-input"
+            placeholder="Admin access key"
+            autocomplete="off"
+            onkeydown="if(event.key==='Enter') offUnlock()"
+          >
+          <button class="btn off-gate-btn" onclick="offUnlock()">
+            Authenticate
+          </button>
+        </div>
+        <div class="off-gate-error" id="off-gate-error" style="display:none">
+          Invalid access key. This attempt has been logged.
+        </div>
+        <div class="off-gate-footer">
+          <span>Mahoraga · Offensive Intelligence Module</span>
+          <span>·</span>
+          <span>Clearance: ADMIN</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── UNLOCKED CONTENT ─────────────────────────────── -->
+    <div class="page off-page" id="off-content" style="display:none">
+
+      <!-- Header -->
+      <div class="page-header">
+        <div>
+          <div class="page-title" style="display:flex;align-items:center;gap:10px">
+            Offensive Intelligence
+            <span class="off-clearance-badge">⚔ ADMIN</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">
+            Attack methodologies extracted and learned from neutralised threats.
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div class="off-stat-pill">
+            <span id="off-stat-families">—</span>
+            <span class="off-stat-label">techniques learned</span>
+          </div>
+          <div class="off-stat-pill">
+            <span id="off-stat-encounters">—</span>
+            <span class="off-stat-label">total encounters</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="offLock()">🔒 Lock</button>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="off-filter-bar">
+        <input type="search" id="off-search" class="off-search" placeholder="Search techniques…"
+               oninput="offFilter()">
+        <div class="off-filter-tabs" id="off-filter-tabs">
+          <button class="off-tab active" data-filter="all" onclick="offSetFilter('all',this)">All</button>
+          <button class="off-tab" data-filter="seen" onclick="offSetFilter('seen',this)">Encountered</button>
+          <button class="off-tab" data-filter="unseen" onclick="offSetFilter('unseen',this)">Not yet seen</button>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="off-grid" id="off-grid">
+        <div class="off-loading" id="off-loading">Loading intelligence data…</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Technique detail modal -->
+<div class="modal-overlay" id="off-modal" style="display:none" onclick="offCloseModal(event)">
+  <div class="modal off-modal-inner">
+    <div class="off-modal-header" id="off-modal-header">
+      <div>
+        <div class="off-modal-tag" id="off-modal-mitre"></div>
+        <div class="off-modal-title" id="off-modal-title"></div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="offCloseModal()">✕</button>
+    </div>
+
+    <div class="off-modal-stats" id="off-modal-stats"></div>
+
+    <div class="off-modal-section">
+      <div class="off-modal-section-title">
+        <span class="off-ms-icon">⚔️</span> Offensive Methodology
+      </div>
+      <div class="off-modal-body" id="off-modal-offensive"></div>
+    </div>
+
+    <div class="off-modal-section" id="off-modal-defensive-wrap">
+      <div class="off-modal-section-title">
+        <span class="off-ms-icon">🛡️</span> How Mahoraga Defends Against This
+      </div>
+      <div class="off-modal-body" id="off-modal-defensive"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/ipc.js"></script>
+<script src="js/offense.js"></script>
+</body>
+</html>

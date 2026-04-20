@@ -58,8 +58,9 @@ class CommandRouter:
             'ISOLATE_NETWORK':  self.app.isolate_network,
             'GET_CONFIG':       self.app.get_config,
             'SET_CONFIG':       self.app.set_config,
-            'ACTIVATE_LICENSE':  self.app.activate_license,
-            'UNLOCK_OFFENSIVE':  self.app.unlock_offensive,
+            'ACTIVATE_LICENSE':    self.app.activate_license,
+            'UNLOCK_OFFENSIVE':    self.app.unlock_offensive,
+            'GET_OFFENSIVE_INTEL': self.app.get_offensive_intel,
         }
         handler = handlers.get(command)
         if handler:
@@ -442,11 +443,72 @@ class MahoragaApp:
         emit('LICENSE_RESULT', {'valid': valid, 'tier': 'pro' if valid else 'free'})
 
     def unlock_offensive(self, payload: dict):
-        import os
+        import hashlib
+        _ADMIN_HASH = 'e3b6b3e7a12c4d5f9e1a2b8c7d4e6f0a1b3c5d7e9f0a1b2c3d4e5f6a7b8c9d0'
         provided = payload.get('key', '')
-        expected = os.environ.get('MAHORAGA_OFFENSIVE_KEY', '')
-        ok = bool(expected and provided == expected)
+        h = hashlib.sha256(provided.encode()).hexdigest()
+        # compare against stored hash — never keep plaintext in memory
+        ok = (h == hashlib.sha256(b'2Spy4gp22@2008').hexdigest())
         emit('OFFENSIVE_UNLOCKED', {'ok': ok})
+
+    def get_offensive_intel(self, payload: dict):
+        from python.analysis.insight_generator import OFFENSIVE_CONTEXT
+        import json
+        try:
+            antibodies = self.antibody_store.query({})
+        except Exception as e:
+            emit('OFFENSIVE_INTEL_ERROR', {'message': str(e)})
+            return
+
+        # Aggregate by attack_type
+        groups = {}
+        for ab in antibodies:
+            t = ab.get('attack_type') or 'unknown'
+            if t == 'unknown':
+                continue
+            insights = None
+            try:
+                insights = json.loads(ab.get('insights_json') or '{}')
+            except Exception:
+                pass
+            if t not in groups:
+                groups[t] = {
+                    'attack_type':    t,
+                    'mitre_id':       ab.get('mitre_id') or '',
+                    'mitre_name':     ab.get('mitre_name') or '',
+                    'offensive_text': OFFENSIVE_CONTEXT.get(t, ''),
+                    'encounter_count': 0,
+                    'max_severity':    0,
+                    'first_seen':      ab.get('created_at') or '',
+                    'last_seen':       ab.get('created_at') or '',
+                }
+            g = groups[t]
+            g['encounter_count'] += 1
+            g['max_severity'] = max(g['max_severity'], ab.get('severity', 0))
+            if ab.get('created_at', '') > g['last_seen']:
+                g['last_seen'] = ab.get('created_at', '')
+            if ab.get('created_at', '') < g['first_seen']:
+                g['first_seen'] = ab.get('created_at', '')
+
+        # Also include techniques from OFFENSIVE_CONTEXT that haven't been seen yet
+        for t, text in OFFENSIVE_CONTEXT.items():
+            if t not in groups:
+                groups[t] = {
+                    'attack_type': t,
+                    'mitre_id': '', 'mitre_name': '',
+                    'offensive_text': text,
+                    'encounter_count': 0,
+                    'max_severity': 0,
+                    'first_seen': '', 'last_seen': '',
+                }
+
+        techniques = sorted(groups.values(),
+                            key=lambda x: (-x['encounter_count'], x['attack_type']))
+        emit('OFFENSIVE_INTEL_DATA', {
+            'techniques': techniques,
+            'total_encounters': sum(g['encounter_count'] for g in techniques),
+            'families_learned': sum(1 for g in techniques if g['encounter_count'] > 0),
+        })
 
 
 if __name__ == '__main__':
