@@ -86,7 +86,10 @@ function onAttackStarted(d) {
 }
 
 function onTerminalLine({ line }) {
-  sbTerminalPrint([['dim', line]]);
+  const cls = line.startsWith('[MAHORAGA]') ? 'red'
+            : line.startsWith('>') ? 'green'
+            : 'dim';
+  sbTerminalPrint([[cls, line]]);
 }
 
 function onSandboxDetection(d) {
@@ -97,11 +100,23 @@ function onSandboxDetection(d) {
   updateScoreUI();
 
   if (caught) {
-    sbTerminalPrint([['red',
-      `[MAHORAGA] DETECTED — severity ${d.severity}/10 · +${d.points} pts`]]);
+    sbTerminalPrint([
+      ['dim', ''],
+      ['red',    `╔══ MAHORAGA DETECTION ══════════════════`],
+      ['red',    `║  THREAT NEUTRALISED`],
+      ['red',    `║  Severity: ${d.severity}/10  ·  +${d.points} pts scored`],
+      ['red',    `╚════════════════════════════════════════`],
+      ['dim', ''],
+    ]);
   } else {
-    sbTerminalPrint([['yellow',
-      `[MAHORAGA] Low-confidence signal (sev ${d.severity}/10) — not escalated`]]);
+    sbTerminalPrint([
+      ['dim', ''],
+      ['yellow', `╔══ MAHORAGA SIGNAL ═════════════════════`],
+      ['yellow', `║  Low-confidence signal (sev ${d.severity}/10)`],
+      ['yellow', `║  Below escalation threshold — evaded`],
+      ['yellow', `╚════════════════════════════════════════`],
+      ['dim', ''],
+    ]);
   }
 
   sbAddDetectionEvent({
@@ -241,10 +256,10 @@ function renderModules() {
         <div class="sb-module-desc">${m.description}</div>
         <div class="sb-module-footer">
           <span class="sb-module-mitre">${m.mitre_id}</span>
-          <span class="sb-module-pts">+${m.points} pts</span>
           <span class="sb-module-dur">~${m.duration_sec}s</span>
+          <span style="margin-left:auto;font-size:10px;font-weight:700;color:var(--text-3)">+${m.points} pts</span>
         </div>
-        ${selected && !done && !disabled ? '<div class="sb-module-launch-hint">Click again to launch ▶</div>' : ''}
+        ${selected && !done && !disabled ? '<div class="sb-module-launch-hint">▶ Click again to launch</div>' : ''}
         <div class="sb-module-tick">✓</div>
       </div>
     `;

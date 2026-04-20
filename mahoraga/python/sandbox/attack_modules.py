@@ -41,7 +41,7 @@ ATTACK_MODULES = [
         technique='Application Layer Protocol',
         mitre_id='T1071',
         difficulty='hard',
-        duration_sec=60,
+        duration_sec=30,
         target_os=['all'],
         points=500,
     ),

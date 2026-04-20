@@ -149,19 +149,13 @@
 .sb-badge-exfil   { background: rgba(42,107,158,0.09); color: #2A6B9E; }
 .sb-badge-recon   { background: rgba(80,80,80,0.09);   color: #888; }
 
-.sb-module-pts {
-  position: absolute; top: 9px; right: 10px;
-  font-size: 10px; font-weight: 700; color: var(--text-3);
-}
-.sb-module.done .sb-module-pts { color: var(--red); }
-
 .sb-module-tick {
   display: none;
   position: absolute; top: 9px; right: 10px;
   font-size: 13px;
+  color: var(--red);
 }
-.sb-module.done .sb-module-tick  { display: block; }
-.sb-module.done .sb-module-pts   { display: none; }
+.sb-module.done .sb-module-tick { display: block; }
 
 /* ── CENTRE: Terminal ────────────────────────────────────────────────── */
 .sb-centre {
@@ -220,10 +214,10 @@
 .sb-terminal-body::-webkit-scrollbar-thumb { background: var(--black-4); }
 
 /* Terminal text colours */
-.sb-t-red    { color: var(--red); }
+.sb-t-red    { color: var(--red); font-weight: 500; }
 .sb-t-bright { color: #e8e8e8; }
 .sb-t-green  { color: #28C840; }
-.sb-t-yellow { color: #FFBD2E; }
+.sb-t-yellow { color: #FFBD2E; font-weight: 500; }
 .sb-t-blue   { color: #6eb5ff; }
 .sb-t-dim    { color: rgba(255,255,255,0.35); }
 .sb-t-muted  { color: rgba(255,255,255,0.5); }
