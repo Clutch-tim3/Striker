@@ -1,5 +1,64 @@
 'use strict';
 
+// ── Module definitions (mirrors python/sandbox/attack_modules.py) ─────────────
+const MODULE_DEFS = {
+  ransomware_sim: {
+    name: 'Ransomware Simulation',
+    description: 'Mass file encryption — rapid modification of sensitive files, typical of WannaCry or LockBit.',
+    technique: 'Data Encrypted for Impact', mitre_id: 'T1486',
+    difficulty: 'medium', duration_sec: 30, points: 300,
+  },
+  c2_beacon_sim: {
+    name: 'C2 Beacon',
+    description: 'Regular outbound packets to a suspicious port — mimics Cobalt Strike or Empire C2 beaconing.',
+    technique: 'Application Layer Protocol', mitre_id: 'T1071',
+    difficulty: 'hard', duration_sec: 30, points: 500,
+  },
+  keylogger_sim: {
+    name: 'Keylogger Injection',
+    description: 'Process injection into explorer.exe hooking keyboard APIs — high connection count and memory writes.',
+    technique: 'Input Capture', mitre_id: 'T1056',
+    difficulty: 'easy', duration_sec: 20, points: 200,
+  },
+  privesc_sim: {
+    name: 'Privilege Escalation',
+    description: 'LOLBin commands (whoami /priv, net localgroup) and token impersonation attempts.',
+    technique: 'Exploitation for Privilege Escalation', mitre_id: 'T1068',
+    difficulty: 'hard', duration_sec: 25, points: 400,
+  },
+  data_exfil_sim: {
+    name: 'Data Exfiltration',
+    description: 'Large outbound network transfers to an unusual destination combined with mass file reads.',
+    technique: 'Exfiltration Over C2 Channel', mitre_id: 'T1041',
+    difficulty: 'expert', duration_sec: 45, points: 600,
+  },
+  rootkit_sim: {
+    name: 'Rootkit Persistence',
+    description: 'Process hiding, system directory modification, and suspicious kernel module or service creation.',
+    technique: 'Rootkit', mitre_id: 'T1014',
+    difficulty: 'expert', duration_sec: 40, points: 700,
+  },
+  lolbin_sim: {
+    name: 'Living off the Land',
+    description: 'certutil downloading a payload, bitsadmin transferring data, regsvr32 executing a remote script.',
+    technique: 'Signed Binary Proxy Execution', mitre_id: 'T1218',
+    difficulty: 'medium', duration_sec: 20, points: 350,
+  },
+  cryptominer_sim: {
+    name: 'Cryptominer',
+    description: 'Sustained high CPU from an unexpected process with outbound connections to known mining pool ports.',
+    technique: 'Resource Hijacking', mitre_id: 'T1496',
+    difficulty: 'easy', duration_sec: 30, points: 150,
+  },
+};
+
+const TARGET_MODULE_IDS = {
+  'WIN-SRV-01': ['ransomware_sim', 'privesc_sim', 'lolbin_sim', 'c2_beacon_sim'],
+  'UBN-WEB-03': ['c2_beacon_sim', 'rootkit_sim', 'data_exfil_sim', 'cryptominer_sim'],
+  'MAC-DEV-07': ['keylogger_sim', 'cryptominer_sim', 'c2_beacon_sim'],
+  'WIN-DC-01':  ['privesc_sim', 'c2_beacon_sim', 'data_exfil_sim', 'rootkit_sim', 'ransomware_sim', 'lolbin_sim'],
+};
+
 // ── Target definitions ────────────────────────────────────────────────────────
 
 const TARGETS = [
@@ -84,6 +143,7 @@ function sbInit() {
   renderTargets();
   renderModules();
   renderLog();
+  sbInitTerminalInput();
 }
 
 // ── Python event router ───────────────────────────────────────────────────────
@@ -202,6 +262,8 @@ function onSessionReset() {
     '<span class="sb-t-red">mahoraga</span><span class="sb-t-dim">@sandbox</span><span class="sb-t-dim">:~$</span>' +
     ' <span class="sb-t-muted">Session reset. Select a target to begin.</span>' +
     '</div>';
+  const inp = document.getElementById('sb-terminal-input');
+  if (inp) { inp.value = ''; inp.focus(); }
   document.getElementById('sb-live-dot').style.opacity = '0.3';
   document.getElementById('sb-terminal-title').textContent = 'mahoraga-sandbox — bash';
   const prog = document.getElementById('sb-attack-progress');
@@ -258,9 +320,15 @@ function sbSelectTarget(id) {
     ['dim', 'Loading attack modules...'],
   ]);
 
-  document.getElementById('sb-module-list').innerHTML =
-    '<div class="sb-module-empty">Loading attack modules...</div>';
+  // Load modules immediately from local data — no IPC roundtrip needed
+  const moduleIds = TARGET_MODULE_IDS[id] || [];
+  state.currentModules = moduleIds
+    .map(mid => MODULE_DEFS[mid] ? { id: mid, ...MODULE_DEFS[mid] } : null)
+    .filter(Boolean);
+  renderModules();
+  sbTerminalPrint([['dim', `${state.currentModules.length} attack modules loaded. Select one to launch.`]]);
 
+  // Also notify Python so it can prepare its simulator
   window.mahoraga.send('SANDBOX_GET_MODULES', { target_id: id });
 }
 
@@ -364,6 +432,160 @@ function sbTerminalPrint(lines) {
     body.appendChild(div);
   });
   body.scrollTop = body.scrollHeight;
+}
+
+// ── Terminal input ────────────────────────────────────────────────────────
+
+let _cmdHistory = [];
+let _historyPos = -1;
+
+function sbInitTerminalInput() {
+  const input  = document.getElementById('sb-terminal-input');
+  const body   = document.getElementById('sb-terminal-body');
+  if (!input) return;
+
+  // Click anywhere in terminal body → focus input
+  body.addEventListener('click', () => input.focus());
+
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      const cmd = input.value.trim();
+      input.value = '';
+      _historyPos = -1;
+      if (cmd) {
+        _cmdHistory.unshift(cmd);
+        sbRunCommand(cmd);
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (_historyPos + 1 < _cmdHistory.length) {
+        _historyPos++;
+        input.value = _cmdHistory[_historyPos];
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (_historyPos > 0) {
+        _historyPos--;
+        input.value = _cmdHistory[_historyPos];
+      } else {
+        _historyPos = -1;
+        input.value = '';
+      }
+    }
+  });
+}
+
+const _WIN_FS = 'Users/  Windows/  Program Files/  Program Files (x86)/  Temp/  PerfLogs/  pagefile.sys';
+const _LIN_FS = 'bin@  boot/  dev/  etc/  home/  lib/  opt/  proc/  root/  run/  srv/  tmp/  usr/  var/';
+
+function sbRunCommand(cmd) {
+  const prompt = document.getElementById('sb-input-prompt');
+  const promptText = prompt ? prompt.textContent : '❯';
+  sbTerminalPrint([['dim', `${promptText} ${cmd}`]]);
+
+  const parts = cmd.split(/\s+/);
+  const base  = parts[0].toLowerCase();
+  const t     = state.selectedTarget ? TARGETS.find(x => x.id === state.selectedTarget) : null;
+  const isWin = t && t.platform === 'Windows';
+
+  switch (base) {
+    case 'help':
+      sbTerminalPrint([
+        ['dim', ''],
+        ['dim', 'Sandbox shell commands:'],
+        ['dim', '  help          show this help'],
+        ['dim', '  clear         clear terminal output'],
+        ['dim', '  whoami        current user'],
+        ['dim', '  id            user identity'],
+        ['dim', '  uname -a      system information'],
+        ['dim', '  ls / dir      list directory'],
+        ['dim', '  ps / tasklist process list'],
+        ['dim', '  netstat -an   network connections'],
+        ['dim', '  cat <file>    read a file'],
+        ['dim', '  pwd           current directory'],
+        ['dim', ''],
+      ]);
+      break;
+
+    case 'clear':
+    case 'cls':
+      document.getElementById('sb-terminal-body').innerHTML = '';
+      break;
+
+    case 'whoami':
+      sbTerminalPrint([['dim', isWin ? 'NT AUTHORITY\\SYSTEM' : 'root']]);
+      break;
+
+    case 'id':
+      sbTerminalPrint([['dim', 'uid=0(root) gid=0(root) groups=0(root),27(sudo)']]);
+      break;
+
+    case 'pwd':
+      sbTerminalPrint([['dim', isWin ? 'C:\\Windows\\System32' : '/root']]);
+      break;
+
+    case 'uname':
+      if (t) sbTerminalPrint([['dim', `${t.os}  ${t.ip}  x86_64`]]);
+      else   sbTerminalPrint([['dim', 'Linux sandbox 5.15.0 #1 SMP x86_64 GNU/Linux']]);
+      break;
+
+    case 'ls':
+    case 'dir':
+      sbTerminalPrint([['dim', t ? (isWin ? _WIN_FS : _LIN_FS) : 'No target selected.']]);
+      break;
+
+    case 'ps':
+    case 'tasklist':
+      if (isWin) {
+        sbTerminalPrint([
+          ['dim', 'Image Name          PID   Mem Usage'],
+          ['dim', 'System              4     248 K'],
+          ['dim', 'svchost.exe         1088  45,320 K'],
+          ['dim', 'lsass.exe           648   22,104 K'],
+          ['dim', 'explorer.exe        3212  84,580 K'],
+          ['dim', 'powershell.exe      4456  36,440 K'],
+        ]);
+      } else {
+        sbTerminalPrint([
+          ['dim', '  PID TTY          TIME CMD'],
+          ['dim', '    1 ?        00:00:01 systemd'],
+          ['dim', ' 2048 ?        00:02:13 sshd'],
+          ['dim', ' 3190 ?        00:00:08 python3'],
+          ['dim', ' 4412 pts/0    00:00:00 bash'],
+        ]);
+      }
+      break;
+
+    case 'netstat':
+      sbTerminalPrint([
+        ['dim', 'Proto  Local Address          Foreign Address        State'],
+        ['dim', 'tcp    0.0.0.0:22             0.0.0.0:*              LISTEN'],
+        ['dim', 'tcp    0.0.0.0:80             0.0.0.0:*              LISTEN'],
+        ['dim', `tcp    ${t ? t.ip : '10.0.0.x'}:22  10.0.0.1:54821         ESTABLISHED`],
+        ['dim', 'udp    0.0.0.0:68             0.0.0.0:*'],
+      ]);
+      break;
+
+    case 'cat':
+      if (parts[1] === '/etc/passwd' || parts[1] === 'passwd') {
+        sbTerminalPrint([
+          ['dim', 'root:x:0:0:root:/root:/bin/bash'],
+          ['dim', 'daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin'],
+          ['dim', 'www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin'],
+          ['dim', 'ubuntu:x:1000:1000::/home/ubuntu:/bin/bash'],
+        ]);
+      } else if (parts[1]) {
+        sbTerminalPrint([['dim', `cat: ${parts[1]}: Permission denied`]]);
+      } else {
+        sbTerminalPrint([['dim', 'cat: missing operand']]);
+      }
+      break;
+
+    default:
+      sbTerminalPrint([['dim', `bash: ${parts[0]}: command not found`]]);
+  }
+
+  document.getElementById('sb-terminal-input').focus();
 }
 
 // ── Detection feed ────────────────────────────────────────────────────────────
