@@ -19,6 +19,7 @@ from python.core.logger import get_logger
 from python.sensor.process_monitor import ProcessMonitor
 from python.sensor.network_sniffer import NetworkSniffer
 from python.sensor.file_watcher import FileWatcher
+from python.sensor.memory_scanner import MemoryScanner
 from python.detection.anomaly_detector import AnomalyDetector
 from python.detection.behaviour_classifier import BehaviourClassifier
 from python.detection.zero_day_heuristics import ZeroDayHeuristics
@@ -79,6 +80,7 @@ class MahoragaApp:
         self.process_monitor = ProcessMonitor(self.on_telemetry)
         self.network_sniffer = NetworkSniffer(self.on_telemetry)
         self.file_watcher = FileWatcher(self.on_telemetry)
+        self.memory_scanner = MemoryScanner(self.on_telemetry)
 
         self.anomaly_detector = AnomalyDetector()
         self.behaviour_classifier = BehaviourClassifier()
@@ -148,6 +150,7 @@ class MahoragaApp:
         self.process_monitor.start()
         self.network_sniffer.start()
         self.file_watcher.start()
+        self.memory_scanner.start()
         self.adaptation_scheduler.start()
         self.demo_simulator.start()
         threading.Thread(target=self._sensor_watchdog, daemon=True).start()
@@ -158,6 +161,7 @@ class MahoragaApp:
         self.process_monitor.stop()
         self.network_sniffer.stop()
         self.file_watcher.stop()
+        self.memory_scanner.stop()
         self.demo_simulator.stop()
         self._monitoring = False
         emit('MONITORING_STOPPED', {'status': 'inactive'})
@@ -176,6 +180,9 @@ class MahoragaApp:
                 if not self.file_watcher.running:
                     logger.warning('FileWatcher died — restarting')
                     self.file_watcher.start()
+                if not self.memory_scanner.running:
+                    logger.warning('MemoryScanner died — restarting')
+                    self.memory_scanner.start()
 
                 # Self-protection: detect if our own process is being targeted
                 import psutil

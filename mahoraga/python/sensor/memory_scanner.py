@@ -49,16 +49,23 @@ class MemoryScanner:
 
     def _scan_process(self, proc):
         import psutil
+        import platform
         p = psutil.Process(proc.info['pid'])
-        maps = p.memory_maps(grouped=False)
-        for region in maps:
-            if 'x' in (region.perms or '') and 'w' in (region.perms or ''):
-                # Writable+executable region — suspicious
-                self.on_telemetry({
-                    'source':        'memory',
-                    'event':         'wx_memory_region',
-                    'pid':           proc.info['pid'],
-                    'name':          proc.info.get('name'),
-                    'region':        region.path or 'anonymous',
-                    'severity_hint': 6,
-                })
+        # memory_maps() not available on macOS in newer psutil versions — check first
+        if not hasattr(p, 'memory_maps') or platform.system() == 'Darwin':
+            return  # Skip on macOS — requires elevated permissions anyway
+        try:
+            maps = p.memory_maps(grouped=False)
+            for region in maps:
+                if 'x' in (region.perms or '') and 'w' in (region.perms or ''):
+                    # Writable+executable region — suspicious
+                    self.on_telemetry({
+                        'source':        'memory',
+                        'event':         'wx_memory_region',
+                        'pid':           proc.info['pid'],
+                        'name':          proc.info.get('name'),
+                        'region':        region.path or 'anonymous',
+                        'severity_hint': 6,
+                    })
+        except (psutil.AccessDenied, AttributeError, RuntimeError):
+            pass  # Silently skip inaccessible processes

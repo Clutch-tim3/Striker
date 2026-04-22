@@ -47,9 +47,14 @@ class BehaviourClassifier:
     def classify(self, telemetry: dict):
         try:
             features = self._extract_features(telemetry)
-            if not hasattr(self.model, 'classes_'):
+            if not hasattr(self.model, 'classes_') or len(self.model.classes_) == 0:
                 return None
-            proba = self.model.predict_proba(features)[0]
+            proba = self.model.predict_proba(features)
+            if proba is None or len(proba) == 0:
+                return None
+            proba = proba[0]
+            if len(proba) == 0:
+                return None
             max_idx = int(np.argmax(proba))
             confidence = proba[max_idx]
             label = self.model.classes_[max_idx]
