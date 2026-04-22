@@ -74,7 +74,15 @@ class AntibodyStore:
             f'SELECT * FROM antibodies {where} ORDER BY created_at DESC LIMIT 100',
             params
         ).fetchall()
-        return [dict(row) for row in rows]
+        # Convert SQLite rows to JSON-safe dicts
+        result = []
+        for row in rows:
+            d = dict(row)
+            # Ensure all fields are JSON-serializable
+            d['severity'] = int(d.get('severity', 0))
+            d['anomaly_score'] = float(d.get('anomaly_score', 0.0))
+            result.append(d)
+        return result
 
     def update_insights(self, antibody_id: str, insights: dict):
         self.db.execute(

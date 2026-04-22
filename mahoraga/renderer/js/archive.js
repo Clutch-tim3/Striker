@@ -18,6 +18,12 @@ const ATTACK_ICONS = {
 
 function init() {
   window.mahoraga.onEvent(handleEvent);
+  refreshArchive();
+  // Auto-refresh archive every 2 seconds for real-time updates
+  setInterval(refreshArchive, 2000);
+}
+
+function refreshArchive() {
   window.mahoraga.send('GET_ARCHIVE', {});
 }
 

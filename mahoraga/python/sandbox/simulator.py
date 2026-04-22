@@ -55,7 +55,8 @@ class AttackSimulator:
         if not self.running or not self.current_module or self._detected_in_run:
             return
         severity = threat.get('severity', 0)
-        if severity >= 5 and self._will_catch:
+        # Lower threshold (>= 3) to trigger immediate adaptation on sandbox attacks
+        if severity >= 3 and self._will_catch:
             self._fire_detection('caught', threat.get('attack_type'), severity)
 
     def reset_session(self):
