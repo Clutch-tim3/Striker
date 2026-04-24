@@ -2,6 +2,7 @@ import json
 import uuid
 import platform
 from datetime import datetime, timezone
+from typing import Optional
 from python.archive.db import Database
 from python.core.logger import get_logger
 
@@ -13,17 +14,29 @@ class AntibodyStore:
         self.db = db
 
     @staticmethod
-    def _safe_json(obj) -> str:
+    def _safe_json(obj) -> Optional[str]:
         try:
             return json.dumps(obj, default=str)
-        except Exception:
-            return json.dumps({})
+        except Exception as e:
+            logger.error(f'JSON serialization failed for {type(obj).__name__}: {e}')
+            return None  # Don't mask failure with empty object
 
     def create(self, threat: dict, response_taken: list, insights: dict = None) -> dict:
         antibody_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         telemetry = threat.get('telemetry', {})
         mitre = threat.get('mitre_id', {})
+
+        # Serialize all fields with proper error handling first
+        telemetry_json = self._safe_json(telemetry)
+        response_json = self._safe_json(response_taken)
+        vector_json = self._safe_json(telemetry)
+
+        if not all([telemetry_json, response_json, vector_json]):
+            raise ValueError(
+                f'Failed to serialize antibody fields: '
+                f'telemetry={bool(telemetry_json)}, response={bool(response_json)}, vector={bool(vector_json)}'
+            )
 
         antibody = {
             'id':             antibody_id,
@@ -33,9 +46,9 @@ class AntibodyStore:
             'mitre_name':     mitre.get('technique_name') if isinstance(mitre, dict) else None,
             'severity':       int(threat.get('severity', 0)),
             'anomaly_score':  float(threat.get('anomaly_score', 0.0)),
-            'telemetry_json': self._safe_json(telemetry),
-            'response_json':  self._safe_json(response_taken),
-            'vector_json':    self._safe_json(telemetry),
+            'telemetry_json': telemetry_json,
+            'response_json':  response_json,
+            'vector_json':    vector_json,
             'detection_ms':   0,
             'neutralised_ms': 0,
             'source':              telemetry.get('source', 'unknown'),
@@ -44,19 +57,16 @@ class AntibodyStore:
             'offensive_unlocked':  0,
         }
 
-        try:
-            self.db.execute("""
-                INSERT INTO antibodies VALUES (
-                    :id, :created_at, :attack_type, :mitre_id, :mitre_name,
-                    :severity, :anomaly_score, :telemetry_json, :response_json,
-                    :vector_json, :detection_ms, :neutralised_ms, :source, :platform,
-                    :insights_json, :offensive_unlocked
-                )
-            """, antibody)
-            self.db.commit()
-            logger.info(f'Antibody created: {antibody_id} ({antibody["attack_type"]})')
-        except Exception as e:
-            logger.error(f'Failed to persist antibody: {e}')
+        self.db.execute("""
+            INSERT INTO antibodies VALUES (
+                :id, :created_at, :attack_type, :mitre_id, :mitre_name,
+                :severity, :anomaly_score, :telemetry_json, :response_json,
+                :vector_json, :detection_ms, :neutralised_ms, :source, :platform,
+                :insights_json, :offensive_unlocked
+            )
+        """, antibody)
+        self.db.commit()
+        logger.info(f'Antibody created: {antibody_id} ({antibody["attack_type"]})')
         return antibody
 
     def query(self, filters: dict = None) -> list:
@@ -85,9 +95,12 @@ class AntibodyStore:
         return result
 
     def update_insights(self, antibody_id: str, insights: dict):
+        insights_json = self._safe_json(insights)
+        if insights_json is None:
+            raise ValueError('Failed to serialize insights')
         self.db.execute(
             'UPDATE antibodies SET insights_json = ? WHERE id = ?',
-            (json.dumps(insights), antibody_id)
+            (insights_json, antibody_id)
         )
         self.db.commit()
 

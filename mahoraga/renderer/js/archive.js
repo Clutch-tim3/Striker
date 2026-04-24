@@ -3,24 +3,52 @@ let currentView = 'grid';
 
 const OFFENSIVE_UNLOCKED = sessionStorage.getItem('mahoraga_offensive') === '1';
 
-const ATTACK_LABELS = {
-  ransomware:'Ransomware', keylogger:'Keylogger', rootkit:'Rootkit',
-  c2_beacon:'C2 Beacon', data_exfil:'Data Exfiltration',
-  cryptominer:'Cryptominer', worm:'Worm', backdoor:'Backdoor',
-  privilege_escalation:'Privilege Escalation',
-};
+// Canonical source of truth for all 16 attack types
+const ATTACK_TYPES = [
+  { id: 'ransomware',               label: 'Ransomware',           icon: '🔒' },
+  { id: 'keylogger',                label: 'Keylogger',            icon: '⌨️'  },
+  { id: 'rootkit',                  label: 'Rootkit',              icon: '🕳️' },
+  { id: 'c2_beacon',                label: 'C2 Beacon',            icon: '📡' },
+  { id: 'data_exfil',               label: 'Data Exfiltration',    icon: '📤' },
+  { id: 'cryptominer',              label: 'Cryptominer',          icon: '⛏️'  },
+  { id: 'worm',                     label: 'Worm',                 icon: '🪱' },
+  { id: 'backdoor',                 label: 'Backdoor',             icon: '🚪' },
+  { id: 'privilege_escalation',     label: 'Privilege Escalation', icon: '⬆️'  },
+  { id: 'gatekeeper_bypass',        label: 'Gatekeeper Bypass',    icon: '🚧' },
+  { id: 'applescript_execution',    label: 'AppleScript Execution',icon: '🍎' },
+  { id: 'keychain_access',          label: 'Keychain Access',      icon: '🔑' },
+  { id: 'persistence_mechanism',    label: 'Persistence Mechanism',icon: '🔁' },
+  { id: 'reverse_shell',            label: 'Reverse Shell',        icon: '🐚' },
+  { id: 'ld_preload_injection',     label: 'LD_PRELOAD Injection', icon: '💉' },
+  { id: 'kernel_module_load',       label: 'Kernel Module Load',   icon: '⚙️'  },
+];
 
-const ATTACK_ICONS = {
-  ransomware:'🔒', keylogger:'⌨️', rootkit:'🕳️', c2_beacon:'📡',
-  data_exfil:'📤', cryptominer:'⛏️', worm:'🪱', backdoor:'🚪',
-  privilege_escalation:'⬆️',
-};
+// Helper lookups derived from canonical ATTACK_TYPES
+const ATTACK_LABELS = Object.fromEntries(ATTACK_TYPES.map(t => [t.id, t.label]));
+const ATTACK_ICONS  = Object.fromEntries(ATTACK_TYPES.map(t => [t.id, t.icon]));
 
 function init() {
   window.mahoraga.onEvent(handleEvent);
   refreshArchive();
+  // Dynamically populate filter dropdown from ATTACK_TYPES
+  populateFilterDropdown();
   // Auto-refresh archive every 2 seconds for real-time updates
   setInterval(refreshArchive, 2000);
+}
+
+function populateFilterDropdown() {
+  const select = document.getElementById('filter-type');
+  if (!select) return;
+  // Keep first option (All Attack Types), clear the rest
+  while (select.options.length > 1) {
+    select.remove(1);
+  }
+  ATTACK_TYPES.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.label;
+    select.appendChild(opt);
+  });
 }
 
 function refreshArchive() {
@@ -34,6 +62,13 @@ function handleEvent(event) {
     renderArchive(allAntibodies);
   }
   if (event.type === 'ARCHIVE_ERROR') {
+    // Show toast notification (non-blocking, dismissible after 5s)
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--red, #e74c3c);color:#fff;padding:12px 18px;border-radius:6px;z-index:9999;font-size:13px;font-family:inherit;box-shadow:0 4px 12px rgba(0,0,0,0.3);max-width:400px;';
+    toast.textContent = `Archive Error: ${event.data?.message || 'Unknown error'}`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+
     const grid = document.getElementById('grid-view');
     if (grid) grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
       <div class="empty-state-icon">⚠️</div>

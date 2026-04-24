@@ -316,6 +316,7 @@ class MahoragaApp:
             self.vector_index.add(antibody)
         except Exception as e:
             logger.error(f'Antibody creation failed: {e}')
+            emit('ARCHIVE_ERROR', {'message': str(e)})
 
         # Notify sandbox simulator if active
         try:
@@ -509,12 +510,21 @@ class MahoragaApp:
         try:
             if attack_type == 'unknown':
                 return
+            # Exact CSV match: match attack_type as a complete element in comma-separated list
             rows = self.db.execute(
-                'SELECT id FROM offensive_strategies WHERE attack_types LIKE ?',
-                (f'%{attack_type}%',)
+                'SELECT id FROM offensive_strategies WHERE attack_types = ?'
+                '   OR attack_types LIKE ?'
+                '   OR attack_types LIKE ?',
+                (
+                    attack_type,
+                    f'{attack_type},%',    # at start: "ransomware,..."
+                    f'%,{attack_type}',    # at end: "...,ransomware"
+                )
             ).fetchall()
             if rows:
                 return
+            # Also check match in middle: "...,ransomware,..."
+            # (covered by '%,{attack_type}' which matches suffix including commas)
             strategy = self.strategy_generator.create_strategy([attack_type])
             logger.info(f'Auto-generated strategy {strategy.get("id")} for {attack_type}')
         except Exception as e:
