@@ -1,8 +1,9 @@
 'use strict';
 
-let _allTechniques = [];
+let _allStrategies = [];
 let _currentFilter = 'all';
-let _unlocked = false;
+let _gateMode = false;      // optional global lock
+let _gateUnlocked = false;  // session flag
 
 const ATTACK_LABELS = {
   ransomware: 'Ransomware', keylogger: 'Keylogger', rootkit: 'Rootkit',
@@ -23,48 +24,71 @@ const ATTACK_ICONS = {
   ld_preload_injection: '💉', kernel_module_load: '⚙️',
 };
 
-const PLATFORM_TAGS = {
-  ransomware: 'Windows · Linux', keylogger: 'Windows', rootkit: 'Linux · Windows',
-  c2_beacon: 'All platforms', data_exfil: 'All platforms',
-  cryptominer: 'All platforms', worm: 'All platforms', backdoor: 'All platforms',
-  privilege_escalation: 'Windows · Linux', gatekeeper_bypass: 'macOS',
-  applescript_execution: 'macOS', keychain_access: 'macOS',
-  persistence_mechanism: 'macOS · Linux', reverse_shell: 'Linux · macOS',
-  ld_preload_injection: 'Linux', kernel_module_load: 'Linux',
-};
-
-// ── Boot ──────────────────────────────────────────────────────────────────────
-
 function offInit() {
   window.mahoraga.onEvent(handleEvent);
+
+  // Load gate mode preference (default false)
+  const stored = sessionStorage.getItem('mahoraga_offense_gate');
+  _gateMode = stored === '1';
+  document.getElementById('gate-toggle-checkbox').checked = _gateMode;
+
+  if (_gateMode) {
+    // Show gate overlay, wait for unlock
+    document.getElementById('off-gate').style.display = 'flex';
+    document.getElementById('off-content').style.display = 'none';
+  } else {
+    _showContent();
+  }
+
+  // Load strategies
+  offLoadStrategies();
+  // Auto-refresh every 5 seconds
+  setInterval(offLoadStrategies, 5000);
 }
 
 function handleEvent(e) {
+  if (e.type === 'OFFENSIVE_STRATEGIES_DATA') {
+    _allStrategies = e.data.strategies || [];
+    updateStats();
+    offFilter();
+  }
+  if (e.type === 'OFFENSIVE_STRATEGY_UNLOCKED') {
+    const { strategy_id, ok } = e.data;
+    if (ok) {
+      const s = _allStrategies.find(s => s.id === strategy_id);
+      if (s) s.locked = 0;
+      const cur = window._currentStrategyModalId;
+      if (cur === strategy_id) {
+        offShowStrategyModal(JSON.stringify(s));
+      }
+      updateStats();
+      offFilter();
+    } else {
+      const err = document.getElementById('off-modal-unlock-error');
+      if (err) err.style.display = 'block';
+    }
+  }
   if (e.type === 'OFFENSIVE_UNLOCKED') {
+    // Global gate unlock
     if (e.data.ok) {
-      _unlocked = true;
-      _showUnlocked();
-      window.mahoraga.send('GET_OFFENSIVE_INTEL', {});
+      _gateUnlocked = true;
+      _showContent();
     } else {
       const err = document.getElementById('off-gate-error');
-      if (err) {
-        err.style.display = 'block';
-        setTimeout(() => { err.style.display = 'none'; }, 3500);
-      }
+      if (err) { err.style.display = 'block'; setTimeout(() => { err.style.display = 'none'; }, 3500); }
       const input = document.getElementById('off-gate-input');
       if (input) { input.value = ''; input.focus(); }
     }
   }
-  if (e.type === 'OFFENSIVE_INTEL_DATA') {
-    _renderIntel(e.data);
-  }
-  if (e.type === 'OFFENSIVE_INTEL_ERROR') {
-    document.getElementById('off-loading').textContent =
-      'Failed to load intelligence data: ' + (e.data.message || 'Unknown error');
-  }
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('off-stat-strategies').textContent = _allStrategies.length;
+  const locked = _allStrategies.filter(s => s.locked === 1).length;
+  document.getElementById('off-stat-locked').textContent = locked;
+}
+
+// ── Gate & Content ─────────────────────────────────────────────────────────────
 
 function offUnlock() {
   const input = document.getElementById('off-gate-input');
@@ -74,51 +98,66 @@ function offUnlock() {
 }
 
 function offLock() {
-  _unlocked = false;
+  offLockContent();
+}
+
+function offLockContent() {
+  _gateUnlocked = false;
   document.getElementById('off-gate').style.display = 'flex';
   document.getElementById('off-content').style.display = 'none';
   const input = document.getElementById('off-gate-input');
   if (input) input.value = '';
 }
 
-function _showUnlocked() {
+function offToggleGate(enabled) {
+  _gateMode = enabled;
+  sessionStorage.setItem('mahoraga_offense_gate', enabled ? '1' : '0');
+  if (enabled) {
+    offLockContent();
+  } else {
+    document.getElementById('off-gate').style.display = 'none';
+    _showContent();
+  }
+}
+
+function _showContent() {
   document.getElementById('off-gate').style.display = 'none';
   document.getElementById('off-content').style.display = 'flex';
+  offLoadStrategies();
 }
 
-// ── Render ────────────────────────────────────────────────────────────────────
+// ── Load Strategies ─────────────────────────────────────────────────────────────
 
-function _renderIntel({ techniques, total_encounters, families_learned }) {
-  _allTechniques = techniques || [];
-
-  document.getElementById('off-stat-families').textContent = families_learned;
-  document.getElementById('off-stat-encounters').textContent = total_encounters;
-
-  offFilter();
+function offLoadStrategies() {
+  window.mahoraga.send('GET_OFFENSIVE_STRATEGIES', {});
 }
+
+// ── Rendering ───────────────────────────────────────────────────────────────────
 
 function offFilter() {
   const search = (document.getElementById('off-search').value || '').toLowerCase();
   const filter = _currentFilter;
 
-  const visible = _allTechniques.filter(t => {
-    if (filter === 'seen'   && t.encounter_count === 0) return false;
-    if (filter === 'unseen' && t.encounter_count > 0)   return false;
+  const visible = _allStrategies.filter(s => {
+    if (filter === 'locked'   && s.locked === 0) return false;
+    if (filter === 'unlocked' && s.locked === 1) return false;
     if (search) {
-      const label = (ATTACK_LABELS[t.attack_type] || t.attack_type).toLowerCase();
-      return label.includes(search) || (t.mitre_id || '').toLowerCase().includes(search);
+      const name = (s.name || '').toLowerCase();
+      const desc = (s.description || '').toLowerCase();
+      const types = (s.attack_types || '').toLowerCase();
+      return name.includes(search) || desc.includes(search) || types.includes(search);
     }
     return true;
   });
 
-  const grid = document.getElementById('off-grid');
+  const grid = document.getElementById('off-strategy-grid');
   document.getElementById('off-loading') && (document.getElementById('off-loading').style.display = 'none');
 
   if (!visible.length) {
-    grid.innerHTML = '<div class="off-empty">No techniques match your filter.</div>';
+    grid.innerHTML = '<div class="off-empty">No strategies match your filter.</div>';
     return;
   }
-  grid.innerHTML = visible.map(buildCard).join('');
+  grid.innerHTML = visible.map(buildStrategyCard).join('');
 }
 
 function offSetFilter(f, btn) {
@@ -128,73 +167,119 @@ function offSetFilter(f, btn) {
   offFilter();
 }
 
-function buildCard(t) {
-  const label    = ATTACK_LABELS[t.attack_type] || t.attack_type.replace(/_/g, ' ');
-  const icon     = ATTACK_ICONS[t.attack_type] || '⚠️';
-  const platform = PLATFORM_TAGS[t.attack_type] || 'All platforms';
-  const seen     = t.encounter_count > 0;
-  const sev      = t.max_severity || 0;
-  const sevLabel = sev >= 9 ? 'critical' : sev >= 7 ? 'high' : sev >= 4 ? 'medium' : 'low';
+function buildStrategyCard(s) {
+  const name = s.name || 'Unnamed Strategy';
+  const desc = s.description || 'No description provided.';
+  const attackTypes = s.attack_types ? s.attack_types.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const locked = s.locked === 1;
+  const createdAt = s.created_at ? new Date(s.created_at).toLocaleDateString() : '—';
 
-  const preview = t.offensive_text
-    ? t.offensive_text.slice(0, 140) + (t.offensive_text.length > 140 ? '…' : '')
-    : 'No offensive context available.';
+  // Build attack type badges (show up to 4, then +N more)
+  const tags = attackTypes.map(at => {
+    const label = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
+    const icon = ATTACK_ICONS[at] || '⚠️';
+    return `<span class="mitre-tag" title="${label}">${icon} ${label}</span>`;
+  });
+  const tagsHtml = tags.length ? tags.slice(0, 4).join('') + (tags.length > 4 ? `<span class="mitre-tag">+${tags.length - 4} more</span>` : '') : '';
+
+  // Card classes
+  const cardClass = `strategy-card${locked ? ' strategy-locked' : ''}`;
 
   return `
-    <div class="off-card${seen ? ' off-card-seen' : ''}"
-         onclick="offShowModal(${JSON.stringify(JSON.stringify(t))})">
-      <div class="off-card-top">
-        <div class="off-card-icon">${icon}</div>
+    <div class="${cardClass}" data-id="${s.id}" onclick="offShowStrategyModal(${JSON.stringify(JSON.stringify(s))})">
+      <div class="strategy-card-top">
+        <div class="strategy-card-icon">${locked ? '🔒' : '⚔️'}</div>
         <div style="flex:1;min-width:0">
-          <div class="off-card-title">${label}</div>
-          <div class="off-card-platform">${platform}</div>
+          <div class="strategy-card-title">${name}</div>
+          <div class="strategy-card-meta">Created ${createdAt} · ${attackTypes.length} technique${attackTypes.length !== 1 ? 's' : ''}</div>
         </div>
-        ${t.mitre_id ? `<span class="mitre-tag">${t.mitre_id}</span>` : ''}
+        ${locked ? '<span class="badge badge-critical">LOCKED</span>' : '<span class="badge">UNLOCKED</span>'}
       </div>
-      <div class="off-card-preview">${preview}</div>
-      <div class="off-card-footer">
-        ${seen
-          ? `<span class="off-encounter-badge"><span class="off-enc-dot"></span>${t.encounter_count} encounter${t.encounter_count !== 1 ? 's' : ''}</span>
-             <span class="badge badge-${sevLabel}" style="font-size:10px">sev ${sev}</span>`
-          : `<span class="off-unseen-badge">Not yet encountered</span>`}
-        <span class="off-card-cta">View intel →</span>
-      </div>
+      <div class="strategy-card-desc">${desc}</div>
+      ${tagsHtml ? `<div class="strategy-card-tags" style="margin-top:8px">${tagsHtml}</div>` : ''}
+      ${locked ? `
+        <div class="strategy-lock-overlay" onclick="event.stopPropagation(); offUnlockStrategyFromCard('${s.id}')">
+          <span class="btn btn-secondary btn-sm">🔓 Unlock</span>
+        </div>
+      ` : ''}
     </div>`;
 }
 
-// ── Modal ─────────────────────────────────────────────────────────────────────
+// ── Modal ────────────────────────────────────────────────────────────────────────
 
-function offShowModal(tJson) {
-  const t = JSON.parse(tJson);
-  const label    = ATTACK_LABELS[t.attack_type] || t.attack_type.replace(/_/g, ' ');
-  const icon     = ATTACK_ICONS[t.attack_type] || '⚠️';
-  const seen     = t.encounter_count > 0;
-  const sev      = t.max_severity || 0;
-  const sevLabel = sev >= 9 ? 'critical' : sev >= 7 ? 'high' : sev >= 4 ? 'medium' : 'low';
+window._currentStrategyModalId = null;
 
-  document.getElementById('off-modal-mitre').textContent =
-    [t.mitre_id, t.mitre_name].filter(Boolean).join(' · ') || 'MITRE ATT&CK';
-  document.getElementById('off-modal-title').textContent = `${icon} ${label}`;
+function offShowStrategyModal(sJson) {
+  const s = JSON.parse(sJson);
+  window._currentStrategyModalId = s.id;
 
-  document.getElementById('off-modal-stats').innerHTML = seen ? `
+  // Header
+  document.getElementById('off-modal-status').textContent = s.locked ? '🔒 LOCKED' : '⚔ UNLOCKED';
+  document.getElementById('off-modal-title').textContent = s.name || 'Unnamed Strategy';
+
+  // Stats
+  const attackTypes = s.attack_types ? s.attack_types.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const created = s.created_at ? new Date(s.created_at).toLocaleDateString() : '—';
+  document.getElementById('off-modal-stats').innerHTML = `
     <div class="off-ms-row">
-      <div class="off-ms-stat"><div class="off-ms-val">${t.encounter_count}</div><div class="off-ms-lbl">Encounters</div></div>
-      <div class="off-ms-stat"><div class="off-ms-val"><span class="badge badge-${sevLabel}">${sev}</span></div><div class="off-ms-lbl">Max Severity</div></div>
-      <div class="off-ms-stat"><div class="off-ms-val" style="font-size:12px">${_fmtDate(t.first_seen)}</div><div class="off-ms-lbl">First Seen</div></div>
-      <div class="off-ms-stat"><div class="off-ms-val" style="font-size:12px">${_fmtDate(t.last_seen)}</div><div class="off-ms-lbl">Last Seen</div></div>
-    </div>` : `<div class="off-ms-row"><div class="off-unseen-banner">This technique has not yet been encountered in the wild on this system.</div></div>`;
+      <div class="off-ms-stat"><div class="off-ms-val">${attackTypes.length}</div><div class="off-ms-lbl">Techniques</div></div>
+      <div class="off-ms-stat"><div class="off-ms-val">${created}</div><div class="off-ms-lbl">Created</div></div>
+      <div class="off-ms-stat"><div class="off-ms-val"><span class="badge ${s.locked ? 'badge-critical' : ''}">${s.locked ? 'Locked' : 'Unlocked'}</span></div><div class="off-ms-lbl">Status</div></div>
+    </div>
+  `;
 
-  document.getElementById('off-modal-offensive').textContent = t.offensive_text || 'No data.';
+  // Strategy Details
+  document.getElementById('off-modal-details').textContent = s.description || 'No description provided.';
 
-  const defWrap = document.getElementById('off-modal-defensive-wrap');
-  const defBody = document.getElementById('off-modal-defensive');
-  if (seen) {
-    defWrap.style.display = 'block';
-    // Defensive text comes from insight_generator.DEFENSIVE_PLAYBOOK via antibody insights
-    // We show a static note — full per-antibody text is in the archive
-    defBody.innerHTML = `See the <a href="archive.html" style="color:var(--red);text-decoration:underline">Antibody Archive</a> for per-encounter defensive analysis for this technique.`;
+  // Offensive Context per attack type
+  const offensiveEl = document.getElementById('off-modal-offensive');
+  if (attackTypes.length) {
+    offensiveEl.innerHTML = attackTypes.map(at => {
+      const label = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
+      const icon = ATTACK_ICONS[at] || '⚠️';
+      const context = s.offensive_contexts ? s.offensive_contexts[at] : 'No offensive context available.';
+      return `<div style="margin-bottom:14px">
+                <div style="font-weight:700;margin-bottom:4px">${icon} ${label}</div>
+                <div style="font-size:13px;color:var(--text-1);line-height:1.6">${context}</div>
+              </div>`;
+    }).join('');
   } else {
-    defWrap.style.display = 'none';
+    offensiveEl.textContent = 'No attack types associated with this strategy.';
+  }
+
+  // Defensive Playbook per attack type
+  const defensiveEl = document.getElementById('off-modal-defensive');
+  if (attackTypes.length) {
+    defensiveEl.innerHTML = attackTypes.map(at => {
+      const label = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
+      const playbook = s.defensive_playbooks ? s.defensive_playbooks[at] : 'No defensive playbook entry available.';
+      return `<div style="margin-bottom:14px">
+                <div style="font-weight:700;margin-bottom:4px">${label}</div>
+                <div style="font-size:13px;color:var(--text-1);line-height:1.6">${playbook}</div>
+              </div>`;
+    }).join('');
+  } else {
+    defensiveEl.textContent = 'No defensive guidance available for this strategy.';
+  }
+
+  // Unlock section
+  const unlockWrap = document.getElementById('off-modal-unlock-wrap');
+  const input = document.getElementById('off-modal-unlock-input');
+  const btn = document.getElementById('off-modal-unlock-btn');
+  const err = document.getElementById('off-modal-unlock-error');
+
+  if (s.locked) {
+    unlockWrap.style.display = 'block';
+    input.value = '';
+    err.style.display = 'none';
+    // Replace button with fresh one to clear previous listeners
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.onclick = () => offUnlockStrategy(s.id);
+    // Allow Enter key
+    input.onkeydown = (e) => { if (e.key === 'Enter') offUnlockStrategy(s.id); };
+  } else {
+    unlockWrap.style.display = 'none';
   }
 
   document.getElementById('off-modal').style.display = 'flex';
@@ -203,15 +288,23 @@ function offShowModal(tJson) {
 function offCloseModal(e) {
   if (e && e.target !== document.getElementById('off-modal')) return;
   document.getElementById('off-modal').style.display = 'none';
+  window._currentStrategyModalId = null;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Unlock ──────────────────────────────────────────────────────────────────────
 
-function _fmtDate(iso) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
-  } catch { return iso.slice(0, 10); }
+function offUnlockStrategyFromCard(strategyId) {
+  const s = _allStrategies.find(s => s.id === strategyId);
+  if (s) offShowStrategyModal(JSON.stringify(s));
 }
+
+function offUnlockStrategy(strategyId) {
+  const input = document.getElementById('off-modal-unlock-input');
+  const key = (input && input.value.trim()) || '';
+  if (!key) { input && input.focus(); return; }
+  window.mahoraga.send('UNLOCK_OFFENSIVE_STRATEGY', { strategy_id: strategyId, key });
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', offInit);

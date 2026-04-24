@@ -27,9 +27,20 @@ CREATE TABLE IF NOT EXISTS antibodies (
     offensive_unlocked  INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS offensive_strategies (
+    id              TEXT PRIMARY KEY,
+    created_at      TEXT NOT NULL,
+    name            TEXT NOT NULL,
+    description     TEXT,
+    attack_types    TEXT,
+    locked          INTEGER DEFAULT 1,
+    unlock_key      TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_attack_type ON antibodies(attack_type);
 CREATE INDEX IF NOT EXISTS idx_severity    ON antibodies(severity);
 CREATE INDEX IF NOT EXISTS idx_created_at  ON antibodies(created_at);
+CREATE INDEX IF NOT EXISTS idx_strat_locked ON offensive_strategies(locked);
 """
 
 
@@ -66,6 +77,11 @@ class Database:
         for ddl in [
             'ALTER TABLE antibodies ADD COLUMN insights_json TEXT',
             'ALTER TABLE antibodies ADD COLUMN offensive_unlocked INTEGER DEFAULT 0',
+            'ALTER TABLE offensive_strategies ADD COLUMN name TEXT',
+            'ALTER TABLE offensive_strategies ADD COLUMN description TEXT',
+            'ALTER TABLE offensive_strategies ADD COLUMN attack_types TEXT',
+            'ALTER TABLE offensive_strategies ADD COLUMN locked INTEGER DEFAULT 1',
+            'ALTER TABLE offensive_strategies ADD COLUMN unlock_key TEXT',
         ]:
             try:
                 c.execute(ddl)

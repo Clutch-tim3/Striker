@@ -170,6 +170,133 @@
   font-weight: 500;
 }
 
+/* ── Gate toggle switch ───────────────────────────────────────────────────────── */
+.gate-toggle input[type="checkbox"] {
+  accent-color: var(--red);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+/* ── Strategy grid ───────────────────────────────────────────────────────────── */
+.off-strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 4px;
+}
+
+/* ── Strategy card ───────────────────────────────────────────────────────────── */
+.strategy-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.strategy-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--border);
+  transition: background 0.15s;
+}
+.strategy-card:hover {
+  border-color: var(--border-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+.strategy-card:hover::before { background: var(--red); }
+
+.strategy-card-locked {
+  opacity: 0.8;
+}
+.strategy-card-locked::before { background: var(--text-3); }
+.strategy-card-locked:hover::before { background: var(--red); }
+
+.strategy-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.strategy-card-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.strategy-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-0);
+  margin-bottom: 2px;
+}
+.strategy-card-meta {
+  font-size: 10.5px;
+  color: var(--text-3);
+  font-family: 'DM Mono', monospace;
+}
+.strategy-card-desc {
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.strategy-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Lock overlay on card */
+.strategy-lock-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  cursor: pointer;
+}
+.strategy-lock-overlay:hover {
+  background: rgba(255,255,255,0.95);
+}
+
+/* Empty state */
+.off-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13px;
+  padding: 32px;
+}
+
+/* ── Modal tweaks ──────────────────────────────────────────────────────────── */
+.off-modal-body {
+  font-size: 13px;
+  color: var(--text-1);
+  line-height: 1.7;
+  background: var(--off-white);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
 /* ── Filter bar ─────────────────────────────────────────────────────────────── */
 .off-filter-bar {
   display: flex;

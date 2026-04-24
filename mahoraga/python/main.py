@@ -34,9 +34,10 @@ from python.demo.threat_simulator import ThreatSimulator
 from python.archive.antibody import AntibodyStore
 from python.archive.vector_index import VectorIndex
 from python.adaptation.scheduler import AdaptationScheduler
-from python.analysis.insight_generator import generate as generate_insights
+from python.analysis.insight_generator import generate as generate_insights, OFFENSIVE_CONTEXT, DEFENSIVE_PLAYBOOK
 from python.sandbox.simulator import AttackSimulator
 from python.sandbox.attack_modules import TARGET_MODULES, MODULES_BY_ID
+from python.archive.strategy_generator import StrategyGenerator
 
 logger = get_logger('main')
 
@@ -62,6 +63,8 @@ class CommandRouter:
             'ACTIVATE_LICENSE':    self.app.activate_license,
             'UNLOCK_OFFENSIVE':    self.app.unlock_offensive,
             'GET_OFFENSIVE_INTEL': self.app.get_offensive_intel,
+            'GET_OFFENSIVE_STRATEGIES': self.app.get_offensive_strategies,
+            'UNLOCK_OFFENSIVE_STRATEGY': self.app.unlock_offensive_strategy,
         }
         handler = handlers.get(command)
         if handler:
@@ -99,6 +102,7 @@ class MahoragaApp:
         )
         self.demo_simulator = ThreatSimulator(self.on_telemetry)
         self.attack_simulator = AttackSimulator(self.on_telemetry)
+        self.strategy_generator = StrategyGenerator(self.db)
 
         # Seed anomaly model only if no trained model exists
         self._seed_anomaly_model()
@@ -323,6 +327,12 @@ class MahoragaApp:
         if not antibody:
             return
 
+        # Auto-generate/update offensive strategy for this attack type
+        try:
+            self._ensure_strategy_for_attack_type(attack_type)
+        except Exception as e:
+            logger.error(f'Strategy auto-gen failed: {e}')
+
         emit('THREAT_NEUTRALISED', {
             'antibody_id': antibody['id'],
             'threat_id':   threat_id,
@@ -457,6 +467,58 @@ class MahoragaApp:
         # compare against stored hash — never keep plaintext in memory
         ok = (h == hashlib.sha256(b'2Spy4gp22@2008').hexdigest())
         emit('OFFENSIVE_UNLOCKED', {'ok': ok})
+
+    def get_offensive_strategies(self, payload: dict):
+        try:
+            rows = self.db.execute(
+                'SELECT * FROM offensive_strategies ORDER BY created_at DESC'
+            ).fetchall()
+            strategies = []
+            for row in rows:
+                s = dict(row)
+                s['locked'] = int(s.get('locked', 1))
+                # Parse attack types CSV and attach context/playbook for each
+                ats = [t.strip() for t in s.get('attack_types', '').split(',') if t.strip()]
+                s['offensive_contexts'] = {at: OFFENSIVE_CONTEXT.get(at, '') for at in ats}
+                s['defensive_playbooks'] = {at: DEFENSIVE_PLAYBOOK.get(at, '') for at in ats}
+                strategies.append(s)
+            emit('OFFENSIVE_STRATEGIES_DATA', {'strategies': strategies})
+        except Exception as e:
+            emit('OFFENSIVE_STRATEGIES_ERROR', {'message': str(e)})
+
+    def unlock_offensive_strategy(self, payload: dict):
+        strategy_id = payload.get('strategy_id', '')
+        key = payload.get('key', '')
+        import hashlib
+        ok = (hashlib.sha256(key.encode()).hexdigest() ==
+              hashlib.sha256(b'2Spy4gp22@2008').hexdigest())
+        if ok:
+            try:
+                self.db.execute(
+                    'UPDATE offensive_strategies SET locked = 0 WHERE id = ?',
+                    (strategy_id,)
+                )
+                self.db.commit()
+                emit('OFFENSIVE_STRATEGY_UNLOCKED', {'strategy_id': strategy_id, 'ok': True})
+            except Exception as e:
+                emit('OFFENSIVE_STRATEGY_UNLOCKED', {'strategy_id': strategy_id, 'ok': False, 'error': str(e)})
+        else:
+            emit('OFFENSIVE_STRATEGY_UNLOCKED', {'strategy_id': strategy_id, 'ok': False})
+
+    def _ensure_strategy_for_attack_type(self, attack_type: str):
+        try:
+            if attack_type == 'unknown':
+                return
+            rows = self.db.execute(
+                'SELECT id FROM offensive_strategies WHERE attack_types LIKE ?',
+                (f'%{attack_type}%',)
+            ).fetchall()
+            if rows:
+                return
+            strategy = self.strategy_generator.create_strategy([attack_type])
+            logger.info(f'Auto-generated strategy {strategy.get("id")} for {attack_type}')
+        except Exception as e:
+            logger.error(f'Strategy auto-gen failed for {attack_type}: {e}')
 
     def get_offensive_intel(self, payload: dict):
         from python.analysis.insight_generator import OFFENSIVE_CONTEXT

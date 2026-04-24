@@ -97,7 +97,7 @@
   <main class="main-content">
 
     <!-- ── LOCKED GATE ─────────────────────────────────── -->
-    <div class="off-gate" id="off-gate">
+    <div class="off-gate" id="off-gate" style="display:none">
       <div class="off-gate-inner">
         <div class="off-gate-lock" id="off-gate-lock">
           <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
@@ -152,31 +152,35 @@
         </div>
         <div style="display:flex;gap:10px;align-items:center">
           <div class="off-stat-pill">
-            <span id="off-stat-families">—</span>
-            <span class="off-stat-label">techniques learned</span>
+            <span id="off-stat-strategies">0</span>
+            <span class="off-stat-label">strategies</span>
           </div>
           <div class="off-stat-pill">
-            <span id="off-stat-encounters">—</span>
-            <span class="off-stat-label">total encounters</span>
+            <span id="off-stat-locked">0</span>
+            <span class="off-stat-label">locked</span>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="offLock()">🔒 Lock</button>
+          <label class="gate-toggle" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-2)">
+            <input type="checkbox" id="gate-toggle-checkbox" onchange="offToggleGate(this.checked)">
+            Require admin gate
+          </label>
+          <button class="btn btn-secondary btn-sm" onclick="offLock()">🔒 Lock All</button>
         </div>
       </div>
 
       <!-- Filter bar -->
       <div class="off-filter-bar">
-        <input type="search" id="off-search" class="off-search" placeholder="Search techniques…"
+        <input type="search" id="off-search" class="off-search" placeholder="Search strategies…"
                oninput="offFilter()">
         <div class="off-filter-tabs" id="off-filter-tabs">
           <button class="off-tab active" data-filter="all" onclick="offSetFilter('all',this)">All</button>
-          <button class="off-tab" data-filter="seen" onclick="offSetFilter('seen',this)">Encountered</button>
-          <button class="off-tab" data-filter="unseen" onclick="offSetFilter('unseen',this)">Not yet seen</button>
+          <button class="off-tab" data-filter="locked" onclick="offSetFilter('locked',this)">Locked</button>
+          <button class="off-tab" data-filter="unlocked" onclick="offSetFilter('unlocked',this)">Unlocked</button>
         </div>
       </div>
 
-      <!-- Grid -->
-      <div class="off-grid" id="off-grid">
-        <div class="off-loading" id="off-loading">Loading intelligence data…</div>
+      <!-- Strategy Grid -->
+      <div class="off-strategy-grid" id="off-strategy-grid">
+        <div class="off-loading" id="off-loading">Loading strategies…</div>
       </div>
     </div>
 
@@ -188,7 +192,7 @@
   <div class="modal off-modal-inner">
     <div class="off-modal-header" id="off-modal-header">
       <div>
-        <div class="off-modal-tag" id="off-modal-mitre"></div>
+        <div class="off-modal-tag" id="off-modal-status"></div>
         <div class="off-modal-title" id="off-modal-title"></div>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="offCloseModal()">✕</button>
@@ -196,18 +200,43 @@
 
     <div class="off-modal-stats" id="off-modal-stats"></div>
 
-    <div class="off-modal-section">
+    <div class="off-modal-section" id="off-modal-details-wrap">
       <div class="off-modal-section-title">
-        <span class="off-ms-icon">⚔️</span> Offensive Methodology
+        <span class="off-ms-icon">📋</span> Strategy Details
+      </div>
+      <div class="off-modal-body" id="off-modal-details"></div>
+    </div>
+
+    <div class="off-modal-section" id="off-modal-offensive-wrap">
+      <div class="off-modal-section-title">
+        <span class="off-ms-icon">⚔️</span> Offensive Context
       </div>
       <div class="off-modal-body" id="off-modal-offensive"></div>
     </div>
 
     <div class="off-modal-section" id="off-modal-defensive-wrap">
       <div class="off-modal-section-title">
-        <span class="off-ms-icon">🛡️</span> How Mahoraga Defends Against This
+        <span class="off-ms-icon">🛡️</span> Defensive Playbook
       </div>
       <div class="off-modal-body" id="off-modal-defensive"></div>
+    </div>
+
+    <!-- Unlock prompt for locked strategies -->
+    <div class="off-modal-section" id="off-modal-unlock-wrap" style="display:none">
+      <div class="off-modal-section-title">
+        <span class="off-ms-icon">🔒</span> Admin Access Required
+      </div>
+      <div class="off-modal-body">
+        <p style="margin-bottom:12px;color:var(--text-2)">Enter admin key to unlock this offensive strategy.</p>
+        <div style="display:flex;gap:8px">
+          <input type="password" id="off-modal-unlock-input" class="off-gate-input"
+                 placeholder="Admin access key" style="flex:1">
+          <button class="btn off-gate-btn" id="off-modal-unlock-btn">Unlock</button>
+        </div>
+        <div class="off-gate-error" id="off-modal-unlock-error" style="display:none;margin-top:8px">
+          Invalid access key.
+        </div>
+      </div>
     </div>
   </div>
 </div>
