@@ -488,7 +488,7 @@ class MahoragaApp:
             strategies = []
             for row in rows:
                 s = dict(row)
-                s['locked'] = int(s.get('locked', 1))
+                s['locked'] = int(s.get('locked', 0))
                 # Parse attack types CSV and attach context/playbook for each
                 ats = [t.strip() for t in s.get('attack_types', '').split(',') if t.strip()]
                 s['offensive_contexts'] = {at: OFFENSIVE_CONTEXT.get(at, '') for at in ats}
