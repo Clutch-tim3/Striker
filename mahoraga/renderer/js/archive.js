@@ -64,7 +64,7 @@ function handleEvent(event) {
   if (event.type === 'ARCHIVE_UPDATED') {
     // Real-time update: refresh archive immediately
     // Only refresh if we're currently viewing the archive page
-    if (document.getElementById('archive-view')) {
+    if (document.getElementById('grid-view')) {
       window.mahoraga.send('GET_ARCHIVE', {});
     }
   }
@@ -87,7 +87,7 @@ function handleEvent(event) {
     window.mahoraga.send('GET_ARCHIVE', {});
   }
   if (event.type === 'OFFENSIVE_STRATEGY_CREATED') {
-    if (document.getElementById('archive-view')) {
+    if (document.getElementById('grid-view')) {
       window.mahoraga.send('GET_ARCHIVE', {});
     }
   }
