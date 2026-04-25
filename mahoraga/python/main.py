@@ -532,7 +532,7 @@ class MahoragaApp:
                 'attack_types':     strategy['attack_types'],
                 'mitre_id':         mitre_id.get('technique_id', '') if mitre_id else '',
                 'mitre_name':       mitre_id.get('technique_name', '') if mitre_id else '',
-                'locked':           1,
+                'locked':           0,
                 'offensive_context': OFFENSIVE_CONTEXT.get(attack_type, ''),
                 'defensive_playbook': DEFENSIVE_PLAYBOOK.get(attack_type, ''),
                 'created_at':       strategy['created_at'],

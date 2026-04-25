@@ -74,7 +74,7 @@ class StrategyGenerator:
             result = []
             for row in rows:
                 d = dict(row)
-                d['locked'] = int(d.get('locked', 1))
+                d['locked'] = int(d.get('locked', 0))
                 result.append(d)
             return result
         except Exception as e:

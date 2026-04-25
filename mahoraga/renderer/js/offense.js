@@ -49,8 +49,6 @@ function handleEvent(e) {
 
 function updateStats() {
   document.getElementById('off-stat-strategies').textContent = _allStrategies.length;
-  const locked = _allStrategies.filter(s => s.locked === 1).length;
-  document.getElementById('off-stat-locked').textContent = locked;
 }
 
 function showNewStrategyFlash(name) {
@@ -95,8 +93,6 @@ function offFilter() {
   const filter = _currentFilter;
 
   const visible = _allStrategies.filter(s => {
-    if (filter === 'locked'   && s.locked === 0) return false;
-    if (filter === 'unlocked' && s.locked === 1) return false;
     if (search) {
       const name = (s.name || '').toLowerCase();
       const desc = (s.description || '').toLowerCase();
@@ -127,7 +123,6 @@ function buildStrategyCard(s) {
   const name = s.name || 'Unnamed Strategy';
   const desc = s.description || 'No description provided.';
   const attackTypes = s.attack_types ? s.attack_types.split(',').map(t => t.trim()).filter(Boolean) : [];
-  const locked = s.locked === 1;
   const createdAt = s.created_at ? new Date(s.created_at).toLocaleDateString() : '—';
 
   // Build attack type badges (show up to 4, then +N more)
@@ -164,7 +159,7 @@ function offShowStrategyModal(sJson) {
   window._currentStrategyModalId = s.id;
 
   // Header
-  document.getElementById('off-modal-status').textContent = s.locked ? '🔒 LOCKED' : '⚔ UNLOCKED';
+  document.getElementById('off-modal-status').textContent = '⚔ UNLOCKED';
   document.getElementById('off-modal-title').textContent = s.name || 'Unnamed Strategy';
 
   // Stats
@@ -174,7 +169,6 @@ function offShowStrategyModal(sJson) {
     <div class="off-ms-row">
       <div class="off-ms-stat"><div class="off-ms-val">${attackTypes.length}</div><div class="off-ms-lbl">Techniques</div></div>
       <div class="off-ms-stat"><div class="off-ms-val">${created}</div><div class="off-ms-lbl">Created</div></div>
-      <div class="off-ms-stat"><div class="off-ms-val"><span class="badge ${s.locked ? 'badge-critical' : ''}">${s.locked ? 'Locked' : 'Unlocked'}</span></div><div class="off-ms-lbl">Status</div></div>
     </div>
   `;
 
@@ -212,26 +206,6 @@ function offShowStrategyModal(sJson) {
     defensiveEl.textContent = 'No defensive guidance available for this strategy.';
   }
 
-  // Unlock section
-  const unlockWrap = document.getElementById('off-modal-unlock-wrap');
-  const input = document.getElementById('off-modal-unlock-input');
-  const btn = document.getElementById('off-modal-unlock-btn');
-  const err = document.getElementById('off-modal-unlock-error');
-
-  if (s.locked) {
-    unlockWrap.style.display = 'block';
-    input.value = '';
-    err.style.display = 'none';
-    // Replace button with fresh one to clear previous listeners
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
-    newBtn.onclick = () => offUnlockStrategy(s.id);
-    // Allow Enter key
-    input.onkeydown = (e) => { if (e.key === 'Enter') offUnlockStrategy(s.id); };
-  } else {
-    unlockWrap.style.display = 'none';
-  }
-
   document.getElementById('off-modal').style.display = 'flex';
 }
 
@@ -239,20 +213,6 @@ function offCloseModal(e) {
   if (e && e.target !== document.getElementById('off-modal')) return;
   document.getElementById('off-modal').style.display = 'none';
   window._currentStrategyModalId = null;
-}
-
-// ── Unlock ──────────────────────────────────────────────────────────────────────
-
-function offUnlockStrategyFromCard(strategyId) {
-  const s = _allStrategies.find(s => s.id === strategyId);
-  if (s) offShowStrategyModal(JSON.stringify(s));
-}
-
-function offUnlockStrategy(strategyId) {
-  const input = document.getElementById('off-modal-unlock-input');
-  const key = (input && input.value.trim()) || '';
-  if (!key) { input && input.focus(); return; }
-  window.mahoraga.send('UNLOCK_OFFENSIVE_STRATEGY', { strategy_id: strategyId, key });
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────

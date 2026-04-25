@@ -112,10 +112,6 @@
              <span id="off-stat-strategies">0</span>
              <span class="off-stat-label">strategies</span>
            </div>
-           <div class="off-stat-pill">
-             <span id="off-stat-locked">0</span>
-             <span class="off-stat-label">locked</span>
-           </div>
          </div>
       </div>
 
@@ -125,8 +121,6 @@
                oninput="offFilter()">
         <div class="off-filter-tabs" id="off-filter-tabs">
           <button class="off-tab active" data-filter="all" onclick="offSetFilter('all',this)">All</button>
-          <button class="off-tab" data-filter="locked" onclick="offSetFilter('locked',this)">Locked</button>
-          <button class="off-tab" data-filter="unlocked" onclick="offSetFilter('unlocked',this)">Unlocked</button>
         </div>
       </div>
 
@@ -173,23 +167,6 @@
       <div class="off-modal-body" id="off-modal-defensive"></div>
     </div>
 
-    <!-- Unlock prompt for locked strategies -->
-    <div class="off-modal-section" id="off-modal-unlock-wrap" style="display:none">
-      <div class="off-modal-section-title">
-        <span class="off-ms-icon">🔒</span> Admin Access Required
-      </div>
-      <div class="off-modal-body">
-        <p style="margin-bottom:12px;color:var(--text-2)">Enter admin key to unlock this offensive strategy.</p>
-        <div style="display:flex;gap:8px">
-          <input type="password" id="off-modal-unlock-input" class="off-gate-input"
-                 placeholder="Admin access key" style="flex:1">
-          <button class="btn off-gate-btn" id="off-modal-unlock-btn">Unlock</button>
-        </div>
-        <div class="off-gate-error" id="off-modal-unlock-error" style="display:none;margin-top:8px">
-          Invalid access key.
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 

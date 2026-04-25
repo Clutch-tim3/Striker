@@ -86,45 +86,9 @@ function handleEvent(event) {
   if (event.type === 'THREAT_NEUTRALISED') {
     window.mahoraga.send('GET_ARCHIVE', {});
   }
-  if (event.type === 'OFFENSIVE_UNLOCKED') {
-    if (event.data.ok) {
-      sessionStorage.setItem('mahoraga_offensive', '1');
-      location.reload();
-    } else {
-      alert('Invalid key.');
-    }
-  }
   if (event.type === 'OFFENSIVE_STRATEGY_CREATED') {
-    // New offensive strategy detected - refresh stats
     if (document.getElementById('archive-view')) {
       window.mahoraga.send('GET_ARCHIVE', {});
-    }
-  }
-}
-  if (event.type === 'ARCHIVE_ERROR') {
-    // Show toast notification (non-blocking, dismissible after 5s)
-    const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--red, #e74c3c);color:#fff;padding:12px 18px;border-radius:6px;z-index:9999;font-size:13px;font-family:inherit;box-shadow:0 4px 12px rgba(0,0,0,0.3);max-width:400px;';
-    toast.textContent = `Archive Error: ${event.data?.message || 'Unknown error'}`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 5000);
-
-    const grid = document.getElementById('grid-view');
-    if (grid) grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-      <div class="empty-state-icon">⚠️</div>
-      <div class="empty-state-title">Archive unavailable</div>
-      <div class="empty-state-sub">${event.data?.message || 'Database error'}</div>
-    </div>`;
-  }
-  if (event.type === 'THREAT_NEUTRALISED') {
-    window.mahoraga.send('GET_ARCHIVE', {});
-  }
-  if (event.type === 'OFFENSIVE_UNLOCKED') {
-    if (event.data.ok) {
-      sessionStorage.setItem('mahoraga_offensive', '1');
-      location.reload();
-    } else {
-      alert('Invalid key.');
     }
   }
 }
