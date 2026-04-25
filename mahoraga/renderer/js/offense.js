@@ -52,6 +52,14 @@ function handleEvent(e) {
     updateStats();
     offFilter();
   }
+  if (e.type === 'OFFENSIVE_STRATEGY_CREATED') {
+    // Add new strategy to local cache, prepend to show at top
+    _allStrategies.unshift(e.data);
+    updateStats();
+    offFilter();
+    // Visual feedback for new intelligence
+    showNewStrategyFlash(e.data.name);
+  }
   if (e.type === 'OFFENSIVE_STRATEGY_UNLOCKED') {
     const { strategy_id, ok } = e.data;
     if (ok) {
@@ -86,6 +94,33 @@ function updateStats() {
   document.getElementById('off-stat-strategies').textContent = _allStrategies.length;
   const locked = _allStrategies.filter(s => s.locked === 1).length;
   document.getElementById('off-stat-locked').textContent = locked;
+}
+
+function showNewStrategyFlash(name) {
+  // Remove any existing flash first
+  const existing = document.querySelector('.off-strategy-flash');
+  if (existing) existing.remove();
+  
+  const flash = document.createElement('div');
+  flash.className = 'off-strategy-flash';
+  flash.innerHTML = `
+    <strong>New Offensive Intelligence</strong>
+    <span style="opacity:0.8">${name}</span>
+  `;
+  flash.style.cssText = `
+    position: fixed; top: 80px; right: 20px; z-index: 9999;
+    background: var(--red); color: #fff; padding: 12px 18px;
+    border-radius: 6px; font-size: 13px; font-weight: 600;
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+    animation: slideInRight 0.3s ease;
+  `;
+  document.body.appendChild(flash);
+  
+  setTimeout(() => {
+    flash.style.opacity = '0';
+    flash.style.transition = 'opacity 0.5s';
+    setTimeout(() => flash.remove(), 500);
+  }, 4000);
 }
 
 // ── Gate & Content ─────────────────────────────────────────────────────────────

@@ -54,10 +54,16 @@ class AttackSimulator:
         """Called by main.py when the real pipeline detects a threat."""
         if not self.running or not self.current_module or self._detected_in_run:
             return
-        severity = threat.get('severity', 0)
+        severity = threat.get('severity',0)
         # Lower threshold (>= 3) to trigger immediate adaptation on sandbox attacks
         if severity >= 3 and self._will_catch:
-            self._fire_detection('caught', threat.get('attack_type'), severity)
+            self._fire_detection(
+                'caught', 
+                threat.get('attack_type'), 
+                severity,
+                antibody_id=threat.get('antibody_id'),
+                strategy_id=threat.get('strategy_id')
+            )
 
     def reset_session(self):
         self.running = False
@@ -68,7 +74,8 @@ class AttackSimulator:
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
-    def _fire_detection(self, result: str, attack_type: str = None, severity: int = 7):
+    def _fire_detection(self, result: str, attack_type: str = None, severity: int = 7,
+                         antibody_id: str = None, strategy_id: str = None):
         if self._detected_in_run:
             return
         self._detected_in_run = True
@@ -77,22 +84,26 @@ class AttackSimulator:
             self.session_stats['caught'] += 1
             self.session_stats['points'] += mod.points
             emit('SANDBOX_DETECTION', {
-                'result':      'caught',
-                'module_id':   mod.id,
-                'attack_type': attack_type or mod.id.replace('_sim', ''),
-                'severity':    severity,
-                'points':      mod.points,
-                'stats':       dict(self.session_stats),
+                'result':       'caught',
+                'module_id':    mod.id,
+                'attack_type':  attack_type or mod.id.replace('_sim', ''),
+                'severity':     severity,
+                'points':       mod.points,
+                'stats':        dict(self.session_stats),
+                'antibody_id':  antibody_id,
+                'strategy_id':  strategy_id,
             })
         else:
             self.session_stats['evaded'] += 1
             emit('SANDBOX_DETECTION', {
-                'result':    'evaded',
-                'module_id': mod.id,
-                'attack_type': attack_type or mod.id.replace('_sim', ''),
-                'severity':  severity,
-                'points':    0,
-                'stats':     dict(self.session_stats),
+                'result':       'evaded',
+                'module_id':    mod.id,
+                'attack_type':  attack_type or mod.id.replace('_sim', ''),
+                'severity':     severity,
+                'points':       0,
+                'stats':        dict(self.session_stats),
+                'antibody_id':  antibody_id,
+                'strategy_id':  strategy_id,
             })
 
     def _run(self, module: AttackModule, target_id: str):

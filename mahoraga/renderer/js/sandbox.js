@@ -158,6 +158,7 @@ function handlePythonEvent(event) {
     case 'SANDBOX_ATTACK_COMPLETE': onAttackComplete(d);    break;
     case 'SANDBOX_SESSION_RESET':   onSessionReset(d);      break;
     case 'SANDBOX_ERROR':           onSandboxError(d);      break;
+    case 'OFFENSE_PREVIEW_DATA':    onOffensePreview(d);    break;
   }
 }
 
@@ -216,7 +217,108 @@ function onSandboxDetection(d) {
     label:    d.attack_type || d.module_id || 'unknown',
     severity: d.severity,
     points:   d.points || 0,
+    // Add offensive analysis link if antibody/strategy were created
+    hasOffenseLink: !!(d.antibody_id || d.strategy_id),
+    antibody_id: d.antibody_id,
+    strategy_id: d.strategy_id,
   });
+}
+
+// ── Offensive Analysis Preview ────────────────────────────────────────────────────
+
+function sbAddDetectionAction(sbEventDiv, d) {
+  const actionBtn = document.createElement('button');
+  actionBtn.className = 'sb-detect-action';
+  actionBtn.textContent = 'View Offensive Analysis';
+  actionBtn.onclick = () => {
+    if (d.strategy_id) {
+      window.mahoraga.send('GET_OFFENSE_PREVIEW', { strategy_id: d.strategy_id });
+    } else if (d.antibody_id) {
+      // Fallback: fetch antibody details and find strategy
+      window.mahoraga.send('GET_ARCHIVE', {});
+    }
+  };
+  sbEventDiv.appendChild(actionBtn);
+}
+
+// Preview handler — shows offense details without full unlock
+function onOffensePreview(d) {
+  showOffensePreviewModal(d.strategy, d.contexts, d.playbooks);
+}
+
+function showOffensePreviewModal(strategy, contexts, playbooks) {
+  // Create modal if not exists
+  let modal = document.getElementById('sb-offense-preview-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'sb-offense-preview-modal';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'none';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:580px">
+        <div class="modal-title" id="sb-preview-title"></div>
+        <div id="sb-preview-content"></div>
+        <div style="display:flex;gap:8px;margin-top:22px;justify-content:flex-end">
+          <button class="btn btn-secondary btn-sm" onclick="this.closest('.modal-overlay').style.display='none'">Close</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const ats = strategy.attack_types || [];
+  const firstAt = ats[0] || 'unknown';
+  
+  document.getElementById('sb-preview-title').innerHTML = `
+    ${ATTACK_ICONS[firstAt] || '⚔️'} Offensive Strategy — ${strategy.name}
+  `;
+  
+  let content = `
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Description</div>
+      <div>${strategy.description || 'No description'}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text-3)">Attack Types</div>
+      <div style="font-size:11px;color:var(--text-3)">${ats.map(a => ATTACK_LABELS[a] || a).join(', ')}</div>
+      <div style="font-size:11px;color:var(--text-3)">Strategy ID</div>
+      <div class="mono" style="font-size:11px">${strategy.id}</div>
+      <div style="font-size:11px;color:var(--text-3)">Created</div>
+      <div style="font-size:11px">${new Date(strategy.created_at).toLocaleString()}</div>
+    </div>
+  `;
+  
+  // Offensive context
+  content += `<div class="off-modal-section" style="margin-top:16px">
+    <div class="off-modal-section-title"><span class="off-ms-icon">⚔️</span> Offensive Context</div>
+    <div class="off-modal-body">`;
+  ats.forEach(at => {
+    content += `<div style="margin-bottom:8px"><strong>${ATTACK_LABELS[at] || at}</strong><br>${contexts[at] || 'No offensive context.'}</div>`;
+  });
+  content += `</div></div>`;
+  
+  // Defensive playbook
+  content += `<div class="off-modal-section">
+    <div class="off-modal-section-title"><span class="off-ms-icon">🛡️</span> Defensive Playbook</div>
+    <div class="off-modal-body">`;
+  ats.forEach(at => {
+    content += `<div style="margin-bottom:8px"><strong>${ATTACK_LABELS[at] || at}</strong><br>${playbooks[at] || 'No defensive guidance.'}</div>`;
+  });
+  content += `</div></div>`;
+  
+  // Unlock note
+  content += `<div style="margin-top:12px;padding:10px;background:var(--red-faint);border-radius:var(--radius);font-size:11px;color:var(--red)">
+    <strong>🔒 Preview Mode</strong> — Full offensive intelligence requires Admin unlock in Offense module.
+  </div>`;
+  
+  document.getElementById('sb-preview-content').innerHTML = content;
+  modal.style.display = 'flex';
+
+  // Close on overlay click
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.style.display = 'none';
+  };
 }
 
 function onAttackComplete(d) {
@@ -590,7 +692,7 @@ function sbRunCommand(cmd) {
 
 // ── Detection feed ────────────────────────────────────────────────────────────
 
-function sbAddDetectionEvent({ caught, label, severity, points }) {
+function sbAddDetectionEvent({ caught, label, severity, points, hasOffenseLink, strategy_id, antibody_id }) {
   const body  = document.getElementById('sb-detect-body');
   const empty = document.getElementById('sb-detect-empty');
   if (empty) empty.style.display = 'none';
@@ -612,6 +714,12 @@ function sbAddDetectionEvent({ caught, label, severity, points }) {
   detail.textContent = 'sev=' + severity + (caught ? ' · +' + points + ' pts' : '');
   ev.appendChild(top);
   ev.appendChild(detail);
+  
+  // Add offensive analysis button if available
+  if (hasOffenseLink) {
+    sbAddDetectionAction(ev, { strategy_id, antibody_id });
+  }
+  
   body.insertBefore(ev, body.firstChild);
 }
 

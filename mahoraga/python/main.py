@@ -65,6 +65,7 @@ class CommandRouter:
             'GET_OFFENSIVE_INTEL': self.app.get_offensive_intel,
             'GET_OFFENSIVE_STRATEGIES': self.app.get_offensive_strategies,
             'UNLOCK_OFFENSIVE_STRATEGY': self.app.unlock_offensive_strategy,
+            'GET_OFFENSE_PREVIEW': self.app.get_offense_preview,
         }
         handler = handlers.get(command)
         if handler:
@@ -318,7 +319,22 @@ class MahoragaApp:
             logger.error(f'Antibody creation failed: {e}')
             emit('ARCHIVE_ERROR', {'message': str(e)})
 
-        # Notify sandbox simulator if active
+        # Add antibody_id to threat for sandbox notification
+        if antibody:
+            threat['antibody_id'] = antibody['id']
+
+        # Auto-generate/update offensive strategy for this attack type
+        strategy_id = None
+        try:
+            strategy_id = self._ensure_strategy_for_attack_type(attack_type, mitre_id)
+        except Exception as e:
+            logger.error(f'Strategy auto-gen failed: {e}')
+
+        # Add strategy_id to threat for sandbox notification
+        if strategy_id:
+            threat['strategy_id'] = strategy_id
+
+        # Notify sandbox simulator if active, pass antibody_id and strategy_id
         try:
             if self.attack_simulator.running:
                 self.attack_simulator.on_detection(threat)
@@ -327,12 +343,6 @@ class MahoragaApp:
 
         if not antibody:
             return
-
-        # Auto-generate/update offensive strategy for this attack type
-        try:
-            self._ensure_strategy_for_attack_type(attack_type)
-        except Exception as e:
-            logger.error(f'Strategy auto-gen failed: {e}')
 
         emit('THREAT_NEUTRALISED', {
             'antibody_id': antibody['id'],
@@ -506,10 +516,11 @@ class MahoragaApp:
         else:
             emit('OFFENSIVE_STRATEGY_UNLOCKED', {'strategy_id': strategy_id, 'ok': False})
 
-    def _ensure_strategy_for_attack_type(self, attack_type: str):
+    def _ensure_strategy_for_attack_type(self, attack_type: str, mitre_id: dict = None):
+        """Ensure offensive strategy exists for attack type. Returns strategy ID if new, else None."""
         try:
             if attack_type == 'unknown':
-                return
+                return None
             # Exact CSV match: match attack_type as a complete element in comma-separated list
             rows = self.db.execute(
                 'SELECT id FROM offensive_strategies WHERE attack_types = ?'
@@ -522,13 +533,30 @@ class MahoragaApp:
                 )
             ).fetchall()
             if rows:
-                return
+                return None
             # Also check match in middle: "...,ransomware,..."
             # (covered by '%,{attack_type}' which matches suffix including commas)
             strategy = self.strategy_generator.create_strategy([attack_type])
             logger.info(f'Auto-generated strategy {strategy.get("id")} for {attack_type}')
+
+            # Emit OFFENSIVE_STRATEGY_CREATED event for real-time frontend updates
+            emit('OFFENSIVE_STRATEGY_CREATED', {
+                'strategy_id':      strategy['id'],
+                'name':             strategy['name'],
+                'description':      strategy['description'],
+                'attack_type':      attack_type,
+                'attack_types':     strategy['attack_types'],
+                'mitre_id':         mitre_id.get('technique_id', '') if mitre_id else '',
+                'mitre_name':       mitre_id.get('technique_name', '') if mitre_id else '',
+                'locked':           1,
+                'offensive_context': OFFENSIVE_CONTEXT.get(attack_type, ''),
+                'defensive_playbook': DEFENSIVE_PLAYBOOK.get(attack_type, ''),
+                'created_at':       strategy['created_at'],
+            })
+            return strategy['id']
         except Exception as e:
             logger.error(f'Strategy auto-gen failed for {attack_type}: {e}')
+            return None
 
     def get_offensive_intel(self, payload: dict):
         from python.analysis.insight_generator import OFFENSIVE_CONTEXT
@@ -588,6 +616,45 @@ class MahoragaApp:
             'total_encounters': sum(g['encounter_count'] for g in techniques),
             'families_learned': sum(1 for g in techniques if g['encounter_count'] > 0),
         })
+
+    def get_offense_preview(self, payload: dict):
+        """Preview offensive strategy details without admin unlock."""
+        strategy_id = payload.get('strategy_id')
+        if not strategy_id:
+            # If no specific ID, get most recent for attack type
+            attack_type = payload.get('attack_type')
+            if attack_type:
+                rows = self.db.execute(
+                    'SELECT * FROM offensive_strategies WHERE attack_types = ? '
+                    '   OR attack_types LIKE ? OR attack_types LIKE ? '
+                    'ORDER BY created_at DESC LIMIT 1',
+                    (attack_type, f'{attack_type},%', f'%,{attack_type}')
+                ).fetchall()
+            else:
+                rows = []
+        else:
+            rows = self.db.execute(
+                'SELECT * FROM offensive_strategies WHERE id = ?',
+                (strategy_id,)
+            ).fetchall()
+        
+        if rows:
+            s = dict(rows[0])
+            ats = [t.strip() for t in s.get('attack_types', '').split(',') if t.strip()]
+            emit('OFFENSE_PREVIEW_DATA', {
+                'strategy': {
+                    'id': s['id'],
+                    'name': s['name'],
+                    'description': s['description'],
+                    'attack_types': ats,
+                    'created_at': s['created_at'],
+                    'locked': s['locked'],
+                },
+                'contexts': {at: OFFENSIVE_CONTEXT.get(at, '') for at in ats},
+                'playbooks': {at: DEFENSIVE_PLAYBOOK.get(at, '') for at in ats},
+            })
+        else:
+            emit('OFFENSE_PREVIEW_ERROR', {'message': 'Strategy not found'})
 
 
 if __name__ == '__main__':

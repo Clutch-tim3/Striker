@@ -445,6 +445,11 @@
   50%       { opacity: 0.3; }
 }
 
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
 .off-unseen-badge {
   font-size: 11px;
   color: var(--text-3);
@@ -546,4 +551,49 @@
   border-radius: var(--radius);
   padding: 14px 16px;
   border-left: 3px solid var(--red);
+}
+
+/* Offense preview banner */
+.off-preview-banner {
+  background: var(--red-faint);
+  border: 1px solid var(--red);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.off-preview-banner .off-pps-text {
+  font-size: 12px;
+  color: var(--red);
+}
+
+.off-preview-banner .off-pps-text strong {
+  font-weight: 700;
+}
+
+.off-preview-banner button {
+  background: var(--red);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Loading overlay */
+.off-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  font-size: 13px;
+  color: var(--text-1);
 }
