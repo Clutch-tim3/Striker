@@ -47,6 +47,31 @@ function handleEvent(event) {
       }
       break;
 
+    case 'ARCHIVE_UPDATED':
+      // Real-time update from batch commit
+      if (event.data && event.data.count !== undefined) {
+        antibodyCount = event.data.count;
+        document.getElementById('antibody-count').textContent = antibodyCount;
+        const archiveBadge = document.getElementById('archive-count');
+        if (archiveBadge) {
+          archiveBadge.textContent = antibodyCount;
+          archiveBadge.style.display = 'inline-block';
+        }
+      }
+      // Flash indicator for new additions
+      const indicator = document.getElementById('antibody-count');
+      if (indicator) {
+        indicator.style.transition = 'none';
+        indicator.style.transform = 'scale(1.3)';
+        indicator.style.color = 'var(--red)';
+        setTimeout(() => {
+          indicator.style.transition = 'all 0.3s ease';
+          indicator.style.transform = 'scale(1)';
+          indicator.style.color = '';
+        }, 300);
+      }
+      break;
+
     case 'THREAT_ANALYSIS_READY':
       if (typeof onAnalysisReady === 'function') onAnalysisReady(event.data);
       break;

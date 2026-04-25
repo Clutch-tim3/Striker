@@ -123,7 +123,37 @@ function showNewStrategyFlash(name) {
   }, 4000);
 }
 
-// ── Gate & Content ─────────────────────────────────────────────────────────────
+// ── Gate Controls ───────────────────────────────────────────────────────────────
+
+function offToggleGate(enabled) {
+  _gateMode = enabled;
+  sessionStorage.setItem('mahoraga_offense_gate', enabled ? '1' : '0');
+  const gate = document.getElementById('off-gate');
+  const content = document.getElementById('off-content');
+  
+  if (enabled && !_gateUnlocked) {
+    gate.style.display = 'flex';
+    content.style.display = 'none';
+  } else {
+    gate.style.display = 'none';
+    content.style.display = 'block';
+  }
+}
+
+function offLock() {
+  _gateUnlocked = false;
+  offToggleGate(true);
+}
+
+function offUnlock() {
+  const input = document.getElementById('off-gate-input');
+  const error = document.getElementById('off-gate-error');
+  window.mahoraga.send('UNLOCK_OFFENSIVE', { key: input.value });
+  input.value = '';
+  error && (error.style.display = 'none');
+}
+
+// ── Offense Page Initialization ─────────────────────────────────────────────────
 
 function offUnlock() {
   const input = document.getElementById('off-gate-input');

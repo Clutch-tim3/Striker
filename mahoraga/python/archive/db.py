@@ -59,6 +59,8 @@ class Database:
         conn.row_factory = sqlite3.Row
         conn.execute('PRAGMA journal_mode=WAL')
         conn.execute('PRAGMA synchronous=NORMAL')
+        # Optimize for concurrent reads/writes
+        conn.execute('PRAGMA busy_timeout=5000')  # 5s before giving up
         conn.executescript(SCHEMA)
         self._migrate(conn)
         conn.commit()
@@ -110,6 +112,7 @@ class Database:
                     return
             except sqlite3.OperationalError as e:
                 if 'database is locked' in str(e) and attempt < max_retries - 1:
-                    time.sleep(0.1 * (2 ** attempt))  # Exponential backoff
+                    # Faster recovery: 10ms, 20ms, 40ms, 80ms, 160ms
+                    time.sleep(0.01 * (2 ** attempt))
                     continue
                 raise

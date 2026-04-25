@@ -313,8 +313,20 @@ class MahoragaApp:
         # ── LAYER 5: ARCHIVE ─────────────────────────────────────────────────
         antibody = None
         try:
-            antibody = self.antibody_store.create(threat, response_taken)
+            antibody, committed = self.antibody_store.create(threat, response_taken)
             self.vector_index.add(antibody)
+            
+            # Emit real-time archive update if commit occurred
+            if committed:
+                emit('ARCHIVE_UPDATED', {
+                    'count': self.antibody_store.count(),
+                    'latest_antibody': {
+                        'id': antibody['id'],
+                        'attack_type': antibody['attack_type'],
+                        'severity': antibody['severity'],
+                        'created_at': antibody['created_at']
+                    }
+                })
         except Exception as e:
             logger.error(f'Antibody creation failed: {e}')
             emit('ARCHIVE_ERROR', {'message': str(e)})

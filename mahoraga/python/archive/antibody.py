@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from python.archive.db import Database
 from python.core.logger import get_logger
+from python.core.ipc_server import emit
 
 logger = get_logger('antibody_store')
 
@@ -12,6 +13,8 @@ logger = get_logger('antibody_store')
 class AntibodyStore:
     def __init__(self, db: Database):
         self.db = db
+        self._pending_count = 0
+        self._max_batch_size = 10
 
     @staticmethod
     def _safe_json(obj) -> Optional[str]:
@@ -65,9 +68,32 @@ class AntibodyStore:
                 :insights_json, :offensive_unlocked
             )
         """, antibody)
-        self.db.commit()
+        
+        # Batch commits: reduce lock contention
+        self._pending_count += 1
+        
+        # Always commit immediately for low batches or non-batch mode
+        # This ensures small numbers of inserts are persisted
+        should_commit = (self._pending_count >= self._max_batch_size) or (self._pending_count <= 1)
+        
+        if should_commit:
+            self.db.commit()
+            # Reset counter, but if we didn't hit batch size, clear all
+            self._pending_count = 0
+            
+            # Emit real-time archive update event
+            emit('ARCHIVE_UPDATED', {
+                'count': self.count(),
+                'latest_antibody': {
+                    'id': antibody['id'],
+                    'attack_type': antibody['attack_type'],
+                    'severity': antibody['severity'],
+                    'created_at': antibody['created_at']
+                }
+            })
+        
         logger.info(f'Antibody created: {antibody_id} ({antibody["attack_type"]})')
-        return antibody
+        return antibody, should_commit
 
     def query(self, filters: dict = None) -> list:
         conditions, params = [], []
@@ -103,6 +129,14 @@ class AntibodyStore:
             (insights_json, antibody_id)
         )
         self.db.commit()
+
+    def flush(self):
+        """Force commit any pending inserts. Returns True if commit was performed."""
+        if self._pending_count > 0:
+            self.db.commit()
+            self._pending_count = 0
+            return True
+        return False
 
     def get_stats(self) -> dict:
         try:
