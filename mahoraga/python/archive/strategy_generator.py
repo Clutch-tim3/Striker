@@ -48,7 +48,7 @@ class StrategyGenerator:
             'name': name,
             'description': description,
             'attack_types': ','.join(attack_types) if attack_types else '',
-            'locked': 1,
+            'locked': 0,
             'unlock_key': None,
         }
         

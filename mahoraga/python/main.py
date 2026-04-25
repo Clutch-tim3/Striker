@@ -61,10 +61,8 @@ class CommandRouter:
             'GET_CONFIG':       self.app.get_config,
             'SET_CONFIG':       self.app.set_config,
             'ACTIVATE_LICENSE':    self.app.activate_license,
-            'UNLOCK_OFFENSIVE':    self.app.unlock_offensive,
             'GET_OFFENSIVE_INTEL': self.app.get_offensive_intel,
             'GET_OFFENSIVE_STRATEGIES': self.app.get_offensive_strategies,
-            'UNLOCK_OFFENSIVE_STRATEGY': self.app.unlock_offensive_strategy,
             'GET_OFFENSE_PREVIEW': self.app.get_offense_preview,
         }
         handler = handlers.get(command)
@@ -482,15 +480,6 @@ class MahoragaApp:
             self.config.save()
         emit('LICENSE_RESULT', {'valid': valid, 'tier': 'pro' if valid else 'free'})
 
-    def unlock_offensive(self, payload: dict):
-        import hashlib
-        _ADMIN_HASH = 'e3b6b3e7a12c4d5f9e1a2b8c7d4e6f0a1b3c5d7e9f0a1b2c3d4e5f6a7b8c9d0'
-        provided = payload.get('key', '')
-        h = hashlib.sha256(provided.encode()).hexdigest()
-        # compare against stored hash — never keep plaintext in memory
-        ok = (h == hashlib.sha256(b'2Spy4gp22@2008').hexdigest())
-        emit('OFFENSIVE_UNLOCKED', {'ok': ok})
-
     def get_offensive_strategies(self, payload: dict):
         try:
             rows = self.db.execute(
@@ -509,24 +498,7 @@ class MahoragaApp:
         except Exception as e:
             emit('OFFENSIVE_STRATEGIES_ERROR', {'message': str(e)})
 
-    def unlock_offensive_strategy(self, payload: dict):
-        strategy_id = payload.get('strategy_id', '')
-        key = payload.get('key', '')
-        import hashlib
-        ok = (hashlib.sha256(key.encode()).hexdigest() ==
-              hashlib.sha256(b'2Spy4gp22@2008').hexdigest())
-        if ok:
-            try:
-                self.db.execute(
-                    'UPDATE offensive_strategies SET locked = 0 WHERE id = ?',
-                    (strategy_id,)
-                )
-                self.db.commit()
-                emit('OFFENSIVE_STRATEGY_UNLOCKED', {'strategy_id': strategy_id, 'ok': True})
-            except Exception as e:
-                emit('OFFENSIVE_STRATEGY_UNLOCKED', {'strategy_id': strategy_id, 'ok': False, 'error': str(e)})
-        else:
-            emit('OFFENSIVE_STRATEGY_UNLOCKED', {'strategy_id': strategy_id, 'ok': False})
+
 
     def _ensure_strategy_for_attack_type(self, attack_type: str, mitre_id: dict = None):
         """Ensure offensive strategy exists for attack type. Returns strategy ID if new, else None."""

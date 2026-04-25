@@ -2,8 +2,6 @@
 
 let _allStrategies = [];
 let _currentFilter = 'all';
-let _gateMode = false;      // optional global lock
-let _gateUnlocked = false;  // session flag
 
 const ATTACK_LABELS = {
   ransomware: 'Ransomware', keylogger: 'Keylogger', rootkit: 'Rootkit',
@@ -27,20 +25,7 @@ const ATTACK_ICONS = {
 function offInit() {
   window.mahoraga.onEvent(handleEvent);
 
-  // Load gate mode preference (default false)
-  const stored = sessionStorage.getItem('mahoraga_offense_gate');
-  _gateMode = stored === '1';
-  document.getElementById('gate-toggle-checkbox').checked = _gateMode;
-
-  if (_gateMode) {
-    // Show gate overlay, wait for unlock
-    document.getElementById('off-gate').style.display = 'flex';
-    document.getElementById('off-content').style.display = 'none';
-  } else {
-    _showContent();
-  }
-
-  // Load strategies
+  // Load strategies immediately
   offLoadStrategies();
   // Auto-refresh every 5 seconds
   setInterval(offLoadStrategies, 5000);
@@ -59,34 +44,6 @@ function handleEvent(e) {
     offFilter();
     // Visual feedback for new intelligence
     showNewStrategyFlash(e.data.name);
-  }
-  if (e.type === 'OFFENSIVE_STRATEGY_UNLOCKED') {
-    const { strategy_id, ok } = e.data;
-    if (ok) {
-      const s = _allStrategies.find(s => s.id === strategy_id);
-      if (s) s.locked = 0;
-      const cur = window._currentStrategyModalId;
-      if (cur === strategy_id) {
-        offShowStrategyModal(JSON.stringify(s));
-      }
-      updateStats();
-      offFilter();
-    } else {
-      const err = document.getElementById('off-modal-unlock-error');
-      if (err) err.style.display = 'block';
-    }
-  }
-  if (e.type === 'OFFENSIVE_UNLOCKED') {
-    // Global gate unlock
-    if (e.data.ok) {
-      _gateUnlocked = true;
-      _showContent();
-    } else {
-      const err = document.getElementById('off-gate-error');
-      if (err) { err.style.display = 'block'; setTimeout(() => { err.style.display = 'none'; }, 3500); }
-      const input = document.getElementById('off-gate-input');
-      if (input) { input.value = ''; input.focus(); }
-    }
   }
 }
 
@@ -123,73 +80,7 @@ function showNewStrategyFlash(name) {
   }, 4000);
 }
 
-// ── Gate Controls ───────────────────────────────────────────────────────────────
 
-function offToggleGate(enabled) {
-  _gateMode = enabled;
-  sessionStorage.setItem('mahoraga_offense_gate', enabled ? '1' : '0');
-  const gate = document.getElementById('off-gate');
-  const content = document.getElementById('off-content');
-  
-  if (enabled && !_gateUnlocked) {
-    gate.style.display = 'flex';
-    content.style.display = 'none';
-  } else {
-    gate.style.display = 'none';
-    content.style.display = 'block';
-  }
-}
-
-function offLock() {
-  _gateUnlocked = false;
-  offToggleGate(true);
-}
-
-function offUnlock() {
-  const input = document.getElementById('off-gate-input');
-  const error = document.getElementById('off-gate-error');
-  window.mahoraga.send('UNLOCK_OFFENSIVE', { key: input.value });
-  input.value = '';
-  error && (error.style.display = 'none');
-}
-
-// ── Offense Page Initialization ─────────────────────────────────────────────────
-
-function offUnlock() {
-  const input = document.getElementById('off-gate-input');
-  const key = (input && input.value.trim()) || '';
-  if (!key) { input && input.focus(); return; }
-  window.mahoraga.send('UNLOCK_OFFENSIVE', { key });
-}
-
-function offLock() {
-  offLockContent();
-}
-
-function offLockContent() {
-  _gateUnlocked = false;
-  document.getElementById('off-gate').style.display = 'flex';
-  document.getElementById('off-content').style.display = 'none';
-  const input = document.getElementById('off-gate-input');
-  if (input) input.value = '';
-}
-
-function offToggleGate(enabled) {
-  _gateMode = enabled;
-  sessionStorage.setItem('mahoraga_offense_gate', enabled ? '1' : '0');
-  if (enabled) {
-    offLockContent();
-  } else {
-    document.getElementById('off-gate').style.display = 'none';
-    _showContent();
-  }
-}
-
-function _showContent() {
-  document.getElementById('off-gate').style.display = 'none';
-  document.getElementById('off-content').style.display = 'flex';
-  offLoadStrategies();
-}
 
 // ── Load Strategies ─────────────────────────────────────────────────────────────
 
@@ -248,25 +139,19 @@ function buildStrategyCard(s) {
   const tagsHtml = tags.length ? tags.slice(0, 4).join('') + (tags.length > 4 ? `<span class="mitre-tag">+${tags.length - 4} more</span>` : '') : '';
 
   // Card classes
-  const cardClass = `strategy-card${locked ? ' strategy-locked' : ''}`;
+  const cardClass = `strategy-card`;
 
   return `
     <div class="${cardClass}" data-id="${s.id}" onclick="offShowStrategyModal(${JSON.stringify(JSON.stringify(s))})">
       <div class="strategy-card-top">
-        <div class="strategy-card-icon">${locked ? '🔒' : '⚔️'}</div>
+        <div class="strategy-card-icon">⚔️</div>
         <div style="flex:1;min-width:0">
           <div class="strategy-card-title">${name}</div>
           <div class="strategy-card-meta">Created ${createdAt} · ${attackTypes.length} technique${attackTypes.length !== 1 ? 's' : ''}</div>
         </div>
-        ${locked ? '<span class="badge badge-critical">LOCKED</span>' : '<span class="badge">UNLOCKED</span>'}
       </div>
       <div class="strategy-card-desc">${desc}</div>
       ${tagsHtml ? `<div class="strategy-card-tags" style="margin-top:8px">${tagsHtml}</div>` : ''}
-      ${locked ? `
-        <div class="strategy-lock-overlay" onclick="event.stopPropagation(); offUnlockStrategyFromCard('${s.id}')">
-          <span class="btn btn-secondary btn-sm">🔓 Unlock</span>
-        </div>
-      ` : ''}
     </div>`;
 }
 

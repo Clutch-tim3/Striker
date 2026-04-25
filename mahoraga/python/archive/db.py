@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS antibodies (
     source              TEXT,
     platform            TEXT,
     insights_json       TEXT,
-    offensive_unlocked  INTEGER DEFAULT 0
+    offensive_unlocked  INTEGER DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS offensive_strategies (
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS offensive_strategies (
     name            TEXT NOT NULL,
     description     TEXT,
     attack_types    TEXT,
-    locked          INTEGER DEFAULT 1,
+    locked          INTEGER DEFAULT 0,
     unlock_key      TEXT
 );
 
@@ -78,11 +78,11 @@ class Database:
         c = conn or self.conn
         for ddl in [
             'ALTER TABLE antibodies ADD COLUMN insights_json TEXT',
-            'ALTER TABLE antibodies ADD COLUMN offensive_unlocked INTEGER DEFAULT 0',
+            'ALTER TABLE antibodies ADD COLUMN offensive_unlocked INTEGER DEFAULT 1',
             'ALTER TABLE offensive_strategies ADD COLUMN name TEXT',
             'ALTER TABLE offensive_strategies ADD COLUMN description TEXT',
             'ALTER TABLE offensive_strategies ADD COLUMN attack_types TEXT',
-            'ALTER TABLE offensive_strategies ADD COLUMN locked INTEGER DEFAULT 1',
+            'ALTER TABLE offensive_strategies ADD COLUMN locked INTEGER DEFAULT 0',
             'ALTER TABLE offensive_strategies ADD COLUMN unlock_key TEXT',
         ]:
             try:
@@ -90,6 +90,9 @@ class Database:
                 c.commit()
             except sqlite3.OperationalError:
                 pass
+        # Ensure all existing data is unlocked (idempotent)
+        c.execute('UPDATE offensive_strategies SET locked = 0 WHERE locked IS NULL OR locked != 0')
+        c.execute('UPDATE antibodies SET offensive_unlocked = 1 WHERE offensive_unlocked IS NULL OR offensive_unlocked != 1')
 
     def execute(self, sql: str, params=()) -> sqlite3.Cursor:
         max_retries = 5

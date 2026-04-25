@@ -57,7 +57,7 @@ class AntibodyStore:
             'source':              telemetry.get('source', 'unknown'),
             'platform':            platform.system(),
             'insights_json':       self._safe_json(insights) if insights else None,
-            'offensive_unlocked':  0,
+            'offensive_unlocked':  1,
         }
 
         self.db.execute("""

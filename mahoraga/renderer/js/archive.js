@@ -1,7 +1,7 @@
 let allAntibodies = [];
 let currentView = 'grid';
 
-const OFFENSIVE_UNLOCKED = sessionStorage.getItem('mahoraga_offensive') === '1';
+
 
 // Canonical source of truth for all 16 attack types
 const ATTACK_TYPES = [
@@ -303,7 +303,7 @@ function showAntibodyModal(abJson) {
 
 function buildAntibodyInsights(ab) {
   const ins = tryParseJSON(ab.insights_json);
-  const offensiveData = OFFENSIVE_UNLOCKED && ab.offensive_unlocked;
+  const offensiveData = ins && ins.offensive;
 
   const offensiveSection = offensiveData
     ? `
@@ -316,13 +316,7 @@ function buildAntibodyInsights(ab) {
         <div class="label" style="margin-top:12px">Raw Telemetry</div>
         <pre class="mono" style="font-size:10px;overflow:auto;max-height:200px;color:var(--text-1)">${JSON.stringify(tryParseJSON(ab.telemetry_json) || {}, null, 2)}</pre>
       </div>`
-    : `
-      <div style="padding:16px 0">
-        <div style="font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.1em">🔒 OFFENSIVE DATA LOCKED</div>
-        <p style="font-family:'Libre Baskerville',serif;font-style:italic;font-size:12px;color:rgba(255,255,255,0.2);margin-top:6px">
-          Contact support@clive.dev to unlock offensive intelligence access.
-        </p>
-      </div>`;
+    : '';
 
   if (!ins) return offensiveSection;
 
