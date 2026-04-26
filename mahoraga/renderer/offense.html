@@ -112,6 +112,10 @@
              <span id="off-stat-strategies">0</span>
              <span class="off-stat-label">strategies</span>
            </div>
+           <div class="off-stat-pill">
+             <span id="off-stat-cycle">—</span>
+             <span class="off-stat-label">adapt cycle</span>
+           </div>
          </div>
       </div>
 
@@ -164,7 +168,14 @@
       <div class="off-modal-section-title">
         <span class="off-ms-icon">🛡️</span> Defensive Playbook
       </div>
-      <div class="off-modal-body" id="off-modal-defensive"></div>
+      <div id="off-modal-defensive"></div>
+    </div>
+
+    <div class="off-modal-footer">
+      <button class="btn btn-sm off-action-btn" onclick="offCopyTactics()">
+        Copy Tactics
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="offCloseModal()">Close</button>
     </div>
 
   </div>

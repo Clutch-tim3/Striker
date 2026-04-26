@@ -2,6 +2,7 @@
 
 let _allStrategies = [];
 let _currentFilter = 'all';
+let _currentStrategy = null;
 
 const ATTACK_LABELS = {
   ransomware: 'Ransomware', keylogger: 'Keylogger', rootkit: 'Rootkit',
@@ -22,94 +23,76 @@ const ATTACK_ICONS = {
   ld_preload_injection: '💉', kernel_module_load: '⚙️',
 };
 
+// attack type → sandbox module id (for Simulate button)
+const SANDBOX_MODULE_MAP = {
+  ransomware:           'ransomware_sim',
+  c2_beacon:            'c2_beacon_sim',
+  keylogger:            'keylogger_sim',
+  privilege_escalation: 'privesc_sim',
+  data_exfil:           'data_exfil_sim',
+  rootkit:              'rootkit_sim',
+  backdoor:             'lolbin_sim',
+  cryptominer:          'cryptominer_sim',
+};
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
 function offInit() {
   window.mahoraga.onEvent(handleEvent);
 
-  // Load strategies immediately
+  // Event delegation — no JSON in onclick attributes
+  document.getElementById('off-strategy-grid').addEventListener('click', e => {
+    const card = e.target.closest('[data-strategy-id]');
+    if (card) offShowStrategyModal(card.dataset.strategyId);
+  });
+
   offLoadStrategies();
-  // Auto-refresh every 5 seconds
   setInterval(offLoadStrategies, 5000);
 }
 
 function handleEvent(e) {
   if (e.type === 'OFFENSIVE_STRATEGIES_DATA') {
     _allStrategies = e.data.strategies || [];
-    updateStats();
+    _updateHeaderStats(_allStrategies.length, e.data.current_cycle);
+    _populateFilterTabs(_allStrategies);
     offFilter();
   }
   if (e.type === 'OFFENSIVE_STRATEGY_CREATED') {
-    // Add new strategy to local cache, prepend to show at top
     _allStrategies.unshift(e.data);
-    updateStats();
+    _updateHeaderStats(_allStrategies.length);
+    _populateFilterTabs(_allStrategies);
     offFilter();
-    // Visual feedback for new intelligence
-    showNewStrategyFlash(e.data.name);
+    _showToast(`New intel: ${e.data.name}`);
   }
 }
 
-function updateStats() {
-  document.getElementById('off-stat-strategies').textContent = _allStrategies.length;
+// ── Header stats ──────────────────────────────────────────────────────────────
+
+function _updateHeaderStats(count, cycle) {
+  document.getElementById('off-stat-strategies').textContent = count;
+  if (cycle !== undefined) {
+    const el = document.getElementById('off-stat-cycle');
+    if (el) el.textContent = cycle;
+  }
 }
 
-function showNewStrategyFlash(name) {
-  // Remove any existing flash first
-  const existing = document.querySelector('.off-strategy-flash');
-  if (existing) existing.remove();
-  
-  const flash = document.createElement('div');
-  flash.className = 'off-strategy-flash';
-  flash.innerHTML = `
-    <strong>New Offensive Intelligence</strong>
-    <span style="opacity:0.8">${name}</span>
-  `;
-  flash.style.cssText = `
-    position: fixed; top: 80px; right: 20px; z-index: 9999;
-    background: var(--red); color: #fff; padding: 12px 18px;
-    border-radius: 6px; font-size: 13px; font-weight: 600;
-    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
-    animation: slideInRight 0.3s ease;
-  `;
-  document.body.appendChild(flash);
-  
-  setTimeout(() => {
-    flash.style.opacity = '0';
-    flash.style.transition = 'opacity 0.5s';
-    setTimeout(() => flash.remove(), 500);
-  }, 4000);
-}
+// ── Filter tabs ───────────────────────────────────────────────────────────────
 
+function _populateFilterTabs(strategies) {
+  const tabs = document.getElementById('off-filter-tabs');
+  const types = new Set();
+  strategies.forEach(s =>
+    (s.attack_types || '').split(',').forEach(t => { t = t.trim(); if (t) types.add(t); })
+  );
 
-
-// ── Load Strategies ─────────────────────────────────────────────────────────────
-
-function offLoadStrategies() {
-  window.mahoraga.send('GET_OFFENSIVE_STRATEGIES', {});
-}
-
-// ── Rendering ───────────────────────────────────────────────────────────────────
-
-function offFilter() {
-  const search = (document.getElementById('off-search').value || '').toLowerCase();
-  const filter = _currentFilter;
-
-  const visible = _allStrategies.filter(s => {
-    if (search) {
-      const name = (s.name || '').toLowerCase();
-      const desc = (s.description || '').toLowerCase();
-      const types = (s.attack_types || '').toLowerCase();
-      return name.includes(search) || desc.includes(search) || types.includes(search);
-    }
-    return true;
+  tabs.innerHTML =
+    `<button class="off-tab${_currentFilter === 'all' ? ' active' : ''}" onclick="offSetFilter('all',this)">All</button>`;
+  types.forEach(type => {
+    const label = ATTACK_LABELS[type] || type.replace(/_/g, ' ');
+    const active = _currentFilter === type ? ' active' : '';
+    tabs.insertAdjacentHTML('beforeend',
+      `<button class="off-tab${active}" onclick="offSetFilter('${type}',this)">${label}</button>`);
   });
-
-  const grid = document.getElementById('off-strategy-grid');
-  document.getElementById('off-loading') && (document.getElementById('off-loading').style.display = 'none');
-
-  if (!visible.length) {
-    grid.innerHTML = '<div class="off-empty">No strategies match your filter.</div>';
-    return;
-  }
-  grid.innerHTML = visible.map(buildStrategyCard).join('');
 }
 
 function offSetFilter(f, btn) {
@@ -119,92 +102,136 @@ function offSetFilter(f, btn) {
   offFilter();
 }
 
-function buildStrategyCard(s) {
-  const name = s.name || 'Unnamed Strategy';
-  const desc = s.description || 'No description provided.';
-  const attackTypes = s.attack_types ? s.attack_types.split(',').map(t => t.trim()).filter(Boolean) : [];
-  const createdAt = s.created_at ? new Date(s.created_at).toLocaleDateString() : '—';
+// ── Load & render ─────────────────────────────────────────────────────────────
 
-  // Build attack type badges (show up to 4, then +N more)
-  const tags = attackTypes.map(at => {
-    const label = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
-    const icon = ATTACK_ICONS[at] || '⚠️';
-    return `<span class="mitre-tag" title="${label}">${icon} ${label}</span>`;
+function offLoadStrategies() {
+  window.mahoraga.send('GET_OFFENSIVE_STRATEGIES', {});
+}
+
+function offFilter() {
+  const search = (document.getElementById('off-search').value || '').toLowerCase();
+
+  const visible = _allStrategies.filter(s => {
+    if (_currentFilter !== 'all') {
+      const types = (s.attack_types || '').split(',').map(t => t.trim());
+      if (!types.includes(_currentFilter)) return false;
+    }
+    if (search) {
+      return (s.name || '').toLowerCase().includes(search) ||
+             (s.description || '').toLowerCase().includes(search) ||
+             (s.attack_types || '').toLowerCase().includes(search);
+    }
+    return true;
   });
-  const tagsHtml = tags.length ? tags.slice(0, 4).join('') + (tags.length > 4 ? `<span class="mitre-tag">+${tags.length - 4} more</span>` : '') : '';
 
-  // Card classes
-  const cardClass = `strategy-card`;
+  const grid = document.getElementById('off-strategy-grid');
+  const loading = document.getElementById('off-loading');
+  if (loading) loading.style.display = 'none';
+
+  grid.innerHTML = visible.length
+    ? visible.map(_buildStrategyCard).join('')
+    : '<div class="off-empty">No strategies match your filter.</div>';
+}
+
+function _buildStrategyCard(s) {
+  const name = s.name || 'Unnamed Strategy';
+  const desc = s.description || '';
+  const attackTypes = (s.attack_types || '').split(',').map(t => t.trim()).filter(Boolean);
+  const createdAt = s.created_at ? new Date(s.created_at).toLocaleDateString() : '—';
+  const version = s.adaptation_version || 0;
+  const primaryIcon = attackTypes[0] ? (ATTACK_ICONS[attackTypes[0]] || '⚔️') : '⚔️';
+
+  const tags = attackTypes.slice(0, 3).map(at =>
+    `<span class="mitre-tag">${ATTACK_ICONS[at] || ''} ${ATTACK_LABELS[at] || at}</span>`
+  ).join('');
+  const extra = attackTypes.length > 3
+    ? `<span class="mitre-tag">+${attackTypes.length - 3} more</span>` : '';
 
   return `
-    <div class="${cardClass}" data-id="${s.id}" onclick="offShowStrategyModal(${JSON.stringify(JSON.stringify(s))})">
+    <div class="strategy-card" data-strategy-id="${s.id}">
       <div class="strategy-card-top">
-        <div class="strategy-card-icon">⚔️</div>
+        <div class="strategy-card-icon">${primaryIcon}</div>
         <div style="flex:1;min-width:0">
           <div class="strategy-card-title">${name}</div>
-          <div class="strategy-card-meta">Created ${createdAt} · ${attackTypes.length} technique${attackTypes.length !== 1 ? 's' : ''}</div>
+          <div class="strategy-card-meta">${createdAt} · ${attackTypes.length} technique${attackTypes.length !== 1 ? 's' : ''}</div>
         </div>
+        <div class="off-version-badge">v${version}</div>
       </div>
-      <div class="strategy-card-desc">${desc}</div>
-      ${tagsHtml ? `<div class="strategy-card-tags" style="margin-top:8px">${tagsHtml}</div>` : ''}
+      ${desc ? `<div class="strategy-card-desc">${desc}</div>` : ''}
+      ${tags ? `<div class="strategy-card-tags">${tags}${extra}</div>` : ''}
+      <div class="strategy-card-cta">View intelligence →</div>
     </div>`;
 }
 
-// ── Modal ────────────────────────────────────────────────────────────────────────
+// ── Modal ─────────────────────────────────────────────────────────────────────
 
-window._currentStrategyModalId = null;
+function offShowStrategyModal(id) {
+  const s = _allStrategies.find(x => x.id === id);
+  if (!s) return;
+  _currentStrategy = s;
 
-function offShowStrategyModal(sJson) {
-  const s = JSON.parse(sJson);
-  window._currentStrategyModalId = s.id;
+  const attackTypes = (s.attack_types || '').split(',').map(t => t.trim()).filter(Boolean);
+  const created = s.created_at ? new Date(s.created_at).toLocaleDateString() : '—';
 
-  // Header
-  document.getElementById('off-modal-status').textContent = '⚔ UNLOCKED';
+  document.getElementById('off-modal-status').textContent = '⚔ OFFENSIVE INTEL';
   document.getElementById('off-modal-title').textContent = s.name || 'Unnamed Strategy';
 
-  // Stats
-  const attackTypes = s.attack_types ? s.attack_types.split(',').map(t => t.trim()).filter(Boolean) : [];
-  const created = s.created_at ? new Date(s.created_at).toLocaleDateString() : '—';
   document.getElementById('off-modal-stats').innerHTML = `
     <div class="off-ms-row">
-      <div class="off-ms-stat"><div class="off-ms-val">${attackTypes.length}</div><div class="off-ms-lbl">Techniques</div></div>
-      <div class="off-ms-stat"><div class="off-ms-val">${created}</div><div class="off-ms-lbl">Created</div></div>
-    </div>
-  `;
+      <div class="off-ms-stat">
+        <div class="off-ms-val">${attackTypes.length}</div>
+        <div class="off-ms-lbl">Techniques</div>
+      </div>
+      <div class="off-ms-stat">
+        <div class="off-ms-val">${created}</div>
+        <div class="off-ms-lbl">Catalogued</div>
+      </div>
+      <div class="off-ms-stat">
+        <div class="off-ms-val">v${s.adaptation_version || 0}</div>
+        <div class="off-ms-lbl">Adaptation</div>
+      </div>
+    </div>`;
 
-  // Strategy Details
-  document.getElementById('off-modal-details').textContent = s.description || 'No description provided.';
+  document.getElementById('off-modal-details').textContent =
+    s.description || 'No description provided.';
 
-  // Offensive Context per attack type
-  const offensiveEl = document.getElementById('off-modal-offensive');
-  if (attackTypes.length) {
-    offensiveEl.innerHTML = attackTypes.map(at => {
-      const label = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
-      const icon = ATTACK_ICONS[at] || '⚠️';
-      const context = s.offensive_contexts ? s.offensive_contexts[at] : 'No offensive context available.';
-      return `<div style="margin-bottom:14px">
-                <div style="font-weight:700;margin-bottom:4px">${icon} ${label}</div>
-                <div style="font-size:13px;color:var(--text-1);line-height:1.6">${context}</div>
-              </div>`;
-    }).join('');
-  } else {
-    offensiveEl.textContent = 'No attack types associated with this strategy.';
-  }
+  // Offensive context — one block per attack type
+  const offEl = document.getElementById('off-modal-offensive');
+  offEl.innerHTML = attackTypes.length
+    ? attackTypes.map(at => {
+        const label = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
+        const icon  = ATTACK_ICONS[at] || '⚠️';
+        const ctx   = (s.offensive_contexts && s.offensive_contexts[at])
+                      || 'No offensive context available for this technique.';
+        const canSim = !!SANDBOX_MODULE_MAP[at];
+        return `
+          <div class="off-technique-block">
+            <div class="off-technique-header">
+              <span class="off-technique-icon">${icon}</span>
+              <span class="off-technique-label">${label}</span>
+              ${canSim ? `<button class="off-simulate-btn" onclick="offSimulateAttackType('${at}')">⚗ Simulate</button>` : ''}
+            </div>
+            <div class="off-modal-body">${ctx}</div>
+          </div>`;
+      }).join('')
+    : '<p style="color:var(--text-3);font-size:13px">No attack types associated with this strategy.</p>';
 
-  // Defensive Playbook per attack type
-  const defensiveEl = document.getElementById('off-modal-defensive');
-  if (attackTypes.length) {
-    defensiveEl.innerHTML = attackTypes.map(at => {
-      const label = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
-      const playbook = s.defensive_playbooks ? s.defensive_playbooks[at] : 'No defensive playbook entry available.';
-      return `<div style="margin-bottom:14px">
-                <div style="font-weight:700;margin-bottom:4px">${label}</div>
-                <div style="font-size:13px;color:var(--text-1);line-height:1.6">${playbook}</div>
-              </div>`;
-    }).join('');
-  } else {
-    defensiveEl.textContent = 'No defensive guidance available for this strategy.';
-  }
+  // Defensive playbook — one block per attack type
+  const defEl = document.getElementById('off-modal-defensive');
+  defEl.innerHTML = attackTypes.length
+    ? attackTypes.map(at => {
+        const label    = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
+        const playbook = (s.defensive_playbooks && s.defensive_playbooks[at])
+                         || 'No defensive playbook entry available.';
+        return `
+          <div class="off-technique-block">
+            <div class="off-technique-header">
+              <span class="off-technique-label">${label}</span>
+            </div>
+            <div class="off-modal-body" style="border-left-color:var(--border-dark)">${playbook}</div>
+          </div>`;
+      }).join('')
+    : '<p style="color:var(--text-3);font-size:13px">No defensive guidance available.</p>';
 
   document.getElementById('off-modal').style.display = 'flex';
 }
@@ -212,9 +239,46 @@ function offShowStrategyModal(sJson) {
 function offCloseModal(e) {
   if (e && e.target !== document.getElementById('off-modal')) return;
   document.getElementById('off-modal').style.display = 'none';
-  window._currentStrategyModalId = null;
+  _currentStrategy = null;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────────
+// ── Offensive actions ─────────────────────────────────────────────────────────
+
+function offSimulateAttackType(attackType) {
+  const label = ATTACK_LABELS[attackType] || attackType;
+  _showToast(`Opening Sandbox — select the ${label} module to run this attack pattern`);
+  setTimeout(() => { window.location.href = 'sandbox.html'; }, 1400);
+}
+
+function offCopyTactics() {
+  const s = _currentStrategy;
+  if (!s) return;
+  const attackTypes = (s.attack_types || '').split(',').map(t => t.trim()).filter(Boolean);
+  const divider = '─'.repeat(56);
+  let text = `OFFENSIVE INTELLIGENCE REPORT\n${divider}\n${s.name}\n${divider}\n\n${s.description || ''}\n\nAdaptation: v${s.adaptation_version || 0}\n\n`;
+  for (const at of attackTypes) {
+    const label = ATTACK_LABELS[at] || at;
+    const ctx   = s.offensive_contexts && s.offensive_contexts[at];
+    if (ctx) text += `[ ${label.toUpperCase()} ]\n${ctx}\n\n`;
+  }
+  navigator.clipboard.writeText(text.trim())
+    .then(() => _showToast('Tactics copied to clipboard'))
+    .catch(() => _showToast('Copy failed'));
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function _showToast(msg) {
+  document.querySelectorAll('.off-toast').forEach(t => t.remove());
+  const el = document.createElement('div');
+  el.className = 'off-toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('off-toast-visible'));
+  setTimeout(() => {
+    el.classList.remove('off-toast-visible');
+    setTimeout(() => el.remove(), 300);
+  }, 3000);
+}
 
 document.addEventListener('DOMContentLoaded', offInit);
