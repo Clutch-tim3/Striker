@@ -26,7 +26,13 @@ _CATCH_CHANCE = {
 
 class AttackSimulator:
     def __init__(self, on_telemetry: Callable):
-        self.on_telemetry = on_telemetry
+        # Wrap the callback to tag every sandbox-originated telemetry dict.
+        # This lets the pipeline distinguish sandbox vs live sensor events
+        # without special-casing any detection logic.
+        def _tagged(t: dict):
+            t['sandbox_source'] = True
+            on_telemetry(t)
+        self.on_telemetry = _tagged
         self.running = False
         self.current_module: AttackModule = None
         self.session_stats = {'caught': 0, 'evaded': 0, 'points': 0, 'attacks_launched': 0}
@@ -80,13 +86,15 @@ class AttackSimulator:
             return
         self._detected_in_run = True
         mod = self.current_module
+        resolved_type = attack_type or mod.id.replace('_sim', '')
+
         if result == 'caught':
             self.session_stats['caught'] += 1
             self.session_stats['points'] += mod.points
             emit('SANDBOX_DETECTION', {
                 'result':       'caught',
                 'module_id':    mod.id,
-                'attack_type':  attack_type or mod.id.replace('_sim', ''),
+                'attack_type':  resolved_type,
                 'severity':     severity,
                 'points':       mod.points,
                 'stats':        dict(self.session_stats),
@@ -98,13 +106,28 @@ class AttackSimulator:
             emit('SANDBOX_DETECTION', {
                 'result':       'evaded',
                 'module_id':    mod.id,
-                'attack_type':  attack_type or mod.id.replace('_sim', ''),
+                'attack_type':  resolved_type,
                 'severity':     severity,
                 'points':       0,
                 'stats':        dict(self.session_stats),
                 'antibody_id':  antibody_id,
                 'strategy_id':  strategy_id,
             })
+
+        # Emit lesson event when the pipeline produced both an antibody and a strategy
+        if antibody_id and strategy_id:
+            emit('SANDBOX_LESSON', {
+                'module_id':    mod.id,
+                'antibody_id':  antibody_id,
+                'strategy_id':  strategy_id,
+                'attack_type':  resolved_type,
+                'result':       result,
+                'points':       mod.points if result == 'caught' else 0,
+            })
+            logger.info(
+                f'SandboxService: Linked strategy {strategy_id[:8]} to module {mod.id} '
+                f'via antibody {antibody_id[:8]}'
+            )
 
     def _run(self, module: AttackModule, target_id: str):
         emit('SANDBOX_ATTACK_STARTED', {

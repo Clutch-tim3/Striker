@@ -9,37 +9,49 @@ DB_PATH = os.path.expanduser('~/.mahoraga/archive.db')
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS antibodies (
-    id              TEXT PRIMARY KEY,
-    created_at      TEXT NOT NULL,
-    attack_type     TEXT,
-    mitre_id        TEXT,
-    mitre_name      TEXT,
-    severity        INTEGER,
-    anomaly_score   REAL,
-    telemetry_json  TEXT,
-    response_json   TEXT,
-    vector_json     TEXT,
+    id                  TEXT PRIMARY KEY,
+    created_at          TEXT NOT NULL,
+    attack_type         TEXT,
+    mitre_id            TEXT,
+    mitre_name          TEXT,
+    severity            INTEGER,
+    anomaly_score       REAL,
+    telemetry_json      TEXT NOT NULL,
+    response_json       TEXT NOT NULL,
+    vector_json         TEXT,
     detection_ms        INTEGER,
     neutralised_ms      INTEGER,
     source              TEXT,
     platform            TEXT,
     insights_json       TEXT,
-    offensive_unlocked  INTEGER DEFAULT 1
+    offensive_unlocked  INTEGER NOT NULL DEFAULT 1,
+    adaptation_version  INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS offensive_strategies (
-    id              TEXT PRIMARY KEY,
-    created_at      TEXT NOT NULL,
-    name            TEXT NOT NULL,
-    description     TEXT,
-    attack_types    TEXT,
-    locked          INTEGER DEFAULT 0,
-    unlock_key      TEXT
+    id                  TEXT PRIMARY KEY,
+    created_at          TEXT NOT NULL,
+    name                TEXT NOT NULL,
+    description         TEXT,
+    attack_types        TEXT,
+    locked              INTEGER NOT NULL DEFAULT 0,
+    unlock_key          TEXT,
+    adaptation_version  INTEGER NOT NULL DEFAULT 0,
+    last_updated        TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_attack_type ON antibodies(attack_type);
-CREATE INDEX IF NOT EXISTS idx_severity    ON antibodies(severity);
-CREATE INDEX IF NOT EXISTS idx_created_at  ON antibodies(created_at);
+CREATE TABLE IF NOT EXISTS adaptation_log (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_time            TEXT NOT NULL,
+    input_antibody_count  INTEGER NOT NULL,
+    output_strategy_count INTEGER NOT NULL,
+    learned_patterns_json TEXT NOT NULL,
+    applied_changes_json  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_attack_type  ON antibodies(attack_type);
+CREATE INDEX IF NOT EXISTS idx_severity     ON antibodies(severity);
+CREATE INDEX IF NOT EXISTS idx_created_at   ON antibodies(created_at);
 CREATE INDEX IF NOT EXISTS idx_strat_locked ON offensive_strategies(locked);
 """
 
@@ -79,20 +91,51 @@ class Database:
         for ddl in [
             'ALTER TABLE antibodies ADD COLUMN insights_json TEXT',
             'ALTER TABLE antibodies ADD COLUMN offensive_unlocked INTEGER DEFAULT 1',
+            'ALTER TABLE antibodies ADD COLUMN adaptation_version INTEGER DEFAULT 0',
             'ALTER TABLE offensive_strategies ADD COLUMN name TEXT',
             'ALTER TABLE offensive_strategies ADD COLUMN description TEXT',
             'ALTER TABLE offensive_strategies ADD COLUMN attack_types TEXT',
             'ALTER TABLE offensive_strategies ADD COLUMN locked INTEGER DEFAULT 0',
             'ALTER TABLE offensive_strategies ADD COLUMN unlock_key TEXT',
+            'ALTER TABLE offensive_strategies ADD COLUMN adaptation_version INTEGER DEFAULT 0',
+            'ALTER TABLE offensive_strategies ADD COLUMN last_updated TEXT',
         ]:
             try:
                 c.execute(ddl)
                 c.commit()
             except sqlite3.OperationalError:
                 pass
-        # Ensure all existing data is unlocked (idempotent)
+        # Create adaptation_log if this is an existing DB that predates the schema
+        try:
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS adaptation_log (
+                    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cycle_time            TEXT NOT NULL,
+                    input_antibody_count  INTEGER NOT NULL,
+                    output_strategy_count INTEGER NOT NULL,
+                    learned_patterns_json TEXT NOT NULL,
+                    applied_changes_json  TEXT NOT NULL
+                )
+            """)
+            c.commit()
+        except Exception:
+            pass
+        # Enforce correct defaults on all existing rows (idempotent)
         c.execute('UPDATE offensive_strategies SET locked = 0 WHERE locked IS NULL OR locked != 0')
         c.execute('UPDATE antibodies SET offensive_unlocked = 1 WHERE offensive_unlocked IS NULL OR offensive_unlocked != 1')
+        c.execute('UPDATE antibodies SET adaptation_version = 0 WHERE adaptation_version IS NULL')
+        c.execute('UPDATE offensive_strategies SET adaptation_version = 0 WHERE adaptation_version IS NULL')
+        c.execute("UPDATE offensive_strategies SET last_updated = created_at WHERE last_updated IS NULL")
+        # Create indexes for new columns only after those columns exist
+        for idx_ddl in [
+            'CREATE INDEX IF NOT EXISTS idx_ab_version    ON antibodies(adaptation_version)',
+            'CREATE INDEX IF NOT EXISTS idx_strat_version ON offensive_strategies(adaptation_version)',
+        ]:
+            try:
+                c.execute(idx_ddl)
+                c.commit()
+            except Exception:
+                pass
 
     def execute(self, sql: str, params=()) -> sqlite3.Cursor:
         max_retries = 5

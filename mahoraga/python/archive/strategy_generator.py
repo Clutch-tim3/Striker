@@ -24,16 +24,13 @@ class StrategyGenerator:
 
     @staticmethod
     def generate_name():
-        """Generate random military-style codename"""
         return f"{random.choice(ADJECTIVES)} {random.choice(NOUNS)}"
 
-    def create_strategy(self, attack_types: list) -> dict:
-        """Create new offensive strategy from attack types"""
+    def create_strategy(self, attack_types: list, adaptation_version: int = 0) -> dict:
         strategy_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         name = self.generate_name()
-        
-        # Description based on attack types
+
         if attack_types:
             at_str = ', '.join(attack_types[:3])
             description = f"Offensive strategy leveraging {at_str} techniques"
@@ -41,62 +38,74 @@ class StrategyGenerator:
                 description += f" and {len(attack_types) - 3} more"
         else:
             description = "Offensive strategy with unspecified techniques"
-        
+
         strategy = {
-            'id': strategy_id,
-            'created_at': now,
-            'name': name,
-            'description': description,
-            'attack_types': ','.join(attack_types) if attack_types else '',
-            'locked': 0,
-            'unlock_key': None,
+            'id':                strategy_id,
+            'created_at':        now,
+            'name':              name,
+            'description':       description,
+            'attack_types':      ','.join(attack_types) if attack_types else '',
+            'locked':            0,
+            'unlock_key':        None,
+            'adaptation_version': adaptation_version,
+            'last_updated':      now,
         }
-        
+
         try:
             self.db.execute("""
-                INSERT INTO offensive_strategies VALUES (
-                    :id, :created_at, :name, :description, :attack_types, :locked, :unlock_key
+                INSERT INTO offensive_strategies (
+                    id, created_at, name, description, attack_types,
+                    locked, unlock_key, adaptation_version, last_updated
+                ) VALUES (
+                    :id, :created_at, :name, :description, :attack_types,
+                    :locked, :unlock_key, :adaptation_version, :last_updated
                 )
             """, strategy)
             self.db.commit()
-            logger.info(f'Strategy created: {strategy_id} ({name})')
+            logger.info(f'Strategy created: {strategy_id} ({name}) v{adaptation_version}')
         except Exception as e:
             logger.error(f'Failed to create strategy: {e}')
-        
+
         return strategy
 
-    def query_strategies(self):
-        """Get all strategies ordered by creation time"""
+    def query_strategies(self) -> list:
         try:
             rows = self.db.execute(
                 'SELECT * FROM offensive_strategies ORDER BY created_at DESC LIMIT 100'
             ).fetchall()
-            result = []
-            for row in rows:
-                d = dict(row)
-                d['locked'] = int(d.get('locked', 0))
-                result.append(d)
-            return result
+            return [dict(row) for row in rows]
         except Exception as e:
             logger.error(f'Failed to query strategies: {e}')
             return []
 
-    def unlock_strategy(self, strategy_id: str, key: str) -> bool:
-        """Unlock individual strategy"""
+    def get_stale_strategies(self, current_version: int) -> list:
+        """Return strategies whose adaptation_version is behind current_version."""
+        try:
+            rows = self.db.execute(
+                'SELECT * FROM offensive_strategies WHERE adaptation_version < ?',
+                (current_version,)
+            ).fetchall()
+            return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f'Failed to query stale strategies: {e}')
+            return []
+
+    def bump_strategy_versions(self, new_version: int) -> int:
+        """Advance all strategies below new_version to new_version. Returns count updated."""
         try:
             self.db.execute(
-                'UPDATE offensive_strategies SET locked = 0, unlock_key = ? WHERE id = ?',
-                (key, strategy_id)
+                'UPDATE offensive_strategies '
+                'SET adaptation_version = ?, last_updated = CURRENT_TIMESTAMP '
+                'WHERE adaptation_version < ?',
+                (new_version, new_version)
             )
             self.db.commit()
-            logger.info(f'Strategy unlocked: {strategy_id}')
-            return True
+            return self.db.execute('SELECT changes()').fetchone()[0]
         except Exception as e:
-            logger.error(f'Failed to unlock strategy: {e}')
-            return False
+            logger.error(f'Failed to bump strategy versions: {e}')
+            return 0
 
     def count_strategies(self) -> int:
-        """Count total strategies"""
         try:
             return self.db.execute('SELECT COUNT(*) FROM offensive_strategies').fetchone()[0]
         except Exception:

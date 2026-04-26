@@ -12,7 +12,11 @@ RETRAIN_HOUR = 2   # 2 AM local time
 class AdaptationScheduler:
     def __init__(self, antibody_store, anomaly_detector, behaviour_classifier):
         self.trainer = Trainer(antibody_store, anomaly_detector, behaviour_classifier)
+        self.engine = None   # Set via set_engine() after AdaptationEngine is constructed
         self.running = False
+
+    def set_engine(self, engine):
+        self.engine = engine
 
     def start(self):
         self.running = True
@@ -32,12 +36,17 @@ class AdaptationScheduler:
                     last_retrain_day != today):
                 logger.info('Nightly retrain triggered')
                 try:
-                    self.trainer.run()
+                    self._run_full_cycle()
                     last_retrain_day = today
                 except Exception as e:
                     logger.error(f'Nightly retrain error: {e}')
             time.sleep(60)
 
     def trigger_now(self):
-        """Manual retrain trigger (e.g. from settings UI)."""
-        threading.Thread(target=self.trainer.run, daemon=True).start()
+        """Manual retrain trigger — runs ML retraining + strategic adaptation cycle."""
+        threading.Thread(target=self._run_full_cycle, daemon=True).start()
+
+    def _run_full_cycle(self):
+        self.trainer.run()
+        if self.engine:
+            self.engine.run_cycle()

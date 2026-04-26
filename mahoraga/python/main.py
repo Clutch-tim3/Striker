@@ -34,6 +34,7 @@ from python.demo.threat_simulator import ThreatSimulator
 from python.archive.antibody import AntibodyStore
 from python.archive.vector_index import VectorIndex
 from python.adaptation.scheduler import AdaptationScheduler
+from python.adaptation.engine import AdaptationEngine, ADAPTATION_BATCH_SIZE
 from python.analysis.insight_generator import generate as generate_insights, OFFENSIVE_CONTEXT, DEFENSIVE_PLAYBOOK
 from python.sandbox.simulator import AttackSimulator
 from python.sandbox.attack_modules import TARGET_MODULES, MODULES_BY_ID
@@ -64,6 +65,8 @@ class CommandRouter:
             'GET_OFFENSIVE_INTEL': self.app.get_offensive_intel,
             'GET_OFFENSIVE_STRATEGIES': self.app.get_offensive_strategies,
             'GET_OFFENSE_PREVIEW': self.app.get_offense_preview,
+            'SANDBOX_GET_STATE':  self.app.sandbox_get_state,
+            'SANDBOX_ADAPT_NOW':  self.app.sandbox_adapt_now,
         }
         handler = handlers.get(command)
         if handler:
@@ -102,6 +105,10 @@ class MahoragaApp:
         self.demo_simulator = ThreatSimulator(self.on_telemetry)
         self.attack_simulator = AttackSimulator(self.on_telemetry)
         self.strategy_generator = StrategyGenerator(self.db)
+        self.adaptation_engine = AdaptationEngine(
+            self.db, self.antibody_store, self.strategy_generator
+        )
+        self.adaptation_scheduler.set_engine(self.adaptation_engine)
 
         # Seed anomaly model only if no trained model exists
         self._seed_anomaly_model()
@@ -313,18 +320,14 @@ class MahoragaApp:
         try:
             antibody, committed = self.antibody_store.create(threat, response_taken)
             self.vector_index.add(antibody)
-            
-            # Emit real-time archive update if commit occurred
-            if committed:
-                emit('ARCHIVE_UPDATED', {
-                    'count': self.antibody_store.count(),
-                    'latest_antibody': {
-                        'id': antibody['id'],
-                        'attack_type': antibody['attack_type'],
-                        'severity': antibody['severity'],
-                        'created_at': antibody['created_at']
-                    }
-                })
+
+            # Trigger adaptation cycle when enough antibodies have accumulated
+            pending = self.antibody_store.get_pending_adaptation_count()
+            if pending >= ADAPTATION_BATCH_SIZE:
+                self.antibody_store.reset_pending_adaptation_count()
+                threading.Thread(
+                    target=self.adaptation_engine.run_cycle, daemon=True
+                ).start()
         except Exception as e:
             logger.error(f'Antibody creation failed: {e}')
             emit('ARCHIVE_ERROR', {'message': str(e)})
@@ -489,16 +492,62 @@ class MahoragaApp:
             for row in rows:
                 s = dict(row)
                 s['locked'] = int(s.get('locked', 0))
-                # Parse attack types CSV and attach context/playbook for each
+                s['adaptation_version'] = int(s.get('adaptation_version', 0))
                 ats = [t.strip() for t in s.get('attack_types', '').split(',') if t.strip()]
                 s['offensive_contexts'] = {at: OFFENSIVE_CONTEXT.get(at, '') for at in ats}
                 s['defensive_playbooks'] = {at: DEFENSIVE_PLAYBOOK.get(at, '') for at in ats}
                 strategies.append(s)
-            emit('OFFENSIVE_STRATEGIES_DATA', {'strategies': strategies})
+            emit('OFFENSIVE_STRATEGIES_DATA', {
+                'strategies':      strategies,
+                'current_cycle':   self.adaptation_engine.get_current_cycle(),
+            })
         except Exception as e:
             emit('OFFENSIVE_STRATEGIES_ERROR', {'message': str(e)})
 
+    def sandbox_get_state(self, payload: dict):
+        since = (payload or {}).get('since', '')
+        try:
+            if since:
+                ab_rows = self.db.execute(
+                    'SELECT id, attack_type, adaptation_version, created_at '
+                    'FROM antibodies WHERE created_at > ? ORDER BY created_at DESC',
+                    (since,)
+                ).fetchall()
+                st_rows = self.db.execute(
+                    'SELECT id, attack_types, adaptation_version, created_at '
+                    'FROM offensive_strategies WHERE created_at > ? ORDER BY created_at DESC',
+                    (since,)
+                ).fetchall()
+            else:
+                ab_rows = self.db.execute(
+                    'SELECT id, attack_type, adaptation_version, created_at '
+                    'FROM antibodies ORDER BY created_at DESC LIMIT 50'
+                ).fetchall()
+                st_rows = self.db.execute(
+                    'SELECT id, attack_types, adaptation_version, created_at '
+                    'FROM offensive_strategies ORDER BY created_at DESC LIMIT 50'
+                ).fetchall()
 
+            cycle_rows = self.db.execute(
+                'SELECT cycle_time, input_antibody_count, output_strategy_count '
+                'FROM adaptation_log ORDER BY id DESC LIMIT 10'
+            ).fetchall()
+
+            emit('SANDBOX_STATE_DATA', {
+                'antibodies_since':         [dict(r) for r in ab_rows],
+                'strategies_since':         [dict(r) for r in st_rows],
+                'adaptation_cycles':        [dict(r) for r in cycle_rows],
+                'current_cycle':            self.adaptation_engine.get_current_cycle(),
+                'pending_adaptation_count': self.antibody_store.get_pending_adaptation_count(),
+                'db_locks':                 {'status': 'unlocked', 'waiting_queries': 0},
+            })
+        except Exception as e:
+            emit('SANDBOX_STATE_ERROR', {'message': str(e)})
+
+    def sandbox_adapt_now(self, payload=None):
+        logger.info('Manual adaptation cycle triggered from sandbox terminal')
+        emit('SANDBOX_ADAPT_STARTED', {'message': 'Adaptation cycle triggered manually'})
+        threading.Thread(target=self.adaptation_engine.run_cycle, daemon=True).start()
 
     def _ensure_strategy_for_attack_type(self, attack_type: str, mitre_id: dict = None):
         """Ensure offensive strategy exists for attack type. Returns strategy ID if new, else None."""
@@ -520,22 +569,27 @@ class MahoragaApp:
                 return None
             # Also check match in middle: "...,ransomware,..."
             # (covered by '%,{attack_type}' which matches suffix including commas)
-            strategy = self.strategy_generator.create_strategy([attack_type])
-            logger.info(f'Auto-generated strategy {strategy.get("id")} for {attack_type}')
+            current_cycle = self.adaptation_engine.get_current_cycle()
+            strategy = self.strategy_generator.create_strategy(
+                [attack_type], adaptation_version=current_cycle
+            )
+            logger.info(
+                f'Auto-generated strategy {strategy.get("id")} for {attack_type} v{current_cycle}'
+            )
 
-            # Emit OFFENSIVE_STRATEGY_CREATED event for real-time frontend updates
             emit('OFFENSIVE_STRATEGY_CREATED', {
-                'strategy_id':      strategy['id'],
-                'name':             strategy['name'],
-                'description':      strategy['description'],
-                'attack_type':      attack_type,
-                'attack_types':     strategy['attack_types'],
-                'mitre_id':         mitre_id.get('technique_id', '') if mitre_id else '',
-                'mitre_name':       mitre_id.get('technique_name', '') if mitre_id else '',
-                'locked':           0,
-                'offensive_context': OFFENSIVE_CONTEXT.get(attack_type, ''),
+                'strategy_id':       strategy['id'],
+                'name':              strategy['name'],
+                'description':       strategy['description'],
+                'attack_type':       attack_type,
+                'attack_types':      strategy['attack_types'],
+                'mitre_id':          mitre_id.get('technique_id', '') if mitre_id else '',
+                'mitre_name':        mitre_id.get('technique_name', '') if mitre_id else '',
+                'locked':            0,
+                'adaptation_version': current_cycle,
+                'offensive_context':  OFFENSIVE_CONTEXT.get(attack_type, ''),
                 'defensive_playbook': DEFENSIVE_PLAYBOOK.get(attack_type, ''),
-                'created_at':       strategy['created_at'],
+                'created_at':        strategy['created_at'],
             })
             return strategy['id']
         except Exception as e:
