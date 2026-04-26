@@ -53,7 +53,7 @@ class StrategyGenerator:
 
         try:
             self.db.execute("""
-                INSERT INTO offensive_strategies (
+                INSERT OR IGNORE INTO offensive_strategies (
                     id, created_at, name, description, attack_types,
                     locked, unlock_key, adaptation_version, last_updated
                 ) VALUES (

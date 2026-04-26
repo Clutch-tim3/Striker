@@ -62,7 +62,7 @@ class AntibodyStore:
         }
 
         self.db.execute("""
-            INSERT INTO antibodies (
+            INSERT OR IGNORE INTO antibodies (
                 id, created_at, attack_type, mitre_id, mitre_name,
                 severity, anomaly_score, telemetry_json, response_json,
                 vector_json, detection_ms, neutralised_ms, source, platform,

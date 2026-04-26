@@ -109,6 +109,7 @@ class MahoragaApp:
             self.db, self.antibody_store, self.strategy_generator
         )
         self.adaptation_scheduler.set_engine(self.adaptation_engine)
+        self._strategy_lock = threading.Lock()  # prevent concurrent strategy creation races
 
         # Seed anomaly model only if no trained model exists
         self._seed_anomaly_model()
@@ -551,6 +552,10 @@ class MahoragaApp:
 
     def _ensure_strategy_for_attack_type(self, attack_type: str, mitre_id: dict = None):
         """Ensure offensive strategy exists for attack type. Returns strategy ID if new, else None."""
+        with self._strategy_lock:
+            return self._ensure_strategy_for_attack_type_locked(attack_type, mitre_id)
+
+    def _ensure_strategy_for_attack_type_locked(self, attack_type: str, mitre_id: dict = None):
         try:
             if attack_type == 'unknown':
                 return None

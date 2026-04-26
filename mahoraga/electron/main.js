@@ -23,9 +23,13 @@ function startPythonBackend() {
         env: { ...process.env, PYTHONPATH: projectRoot },
       });
 
+  let _pythonBuffer = '';
   pythonProcess.stdout.on('data', (data) => {
-    const lines = data.toString().split('\n').filter(Boolean);
+    _pythonBuffer += data.toString();
+    const lines = _pythonBuffer.split('\n');
+    _pythonBuffer = lines.pop(); // keep incomplete trailing piece for next chunk
     lines.forEach(line => {
+      if (!line.trim()) return;
       try {
         const msg = JSON.parse(line);
         handlePythonMessage(msg);
