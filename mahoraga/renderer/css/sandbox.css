@@ -513,3 +513,139 @@
   margin-top: 6px;
   letter-spacing: 0.02em;
 }
+
+/* ── Session timer pill ──────────────────────────────────────────────────── */
+.sb-timer-pill {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 11px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Mascot ──────────────────────────────────────────────────────────────── */
+.sb-mascot {
+  background: rgba(0,0,0,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.sb-mascot-art {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-1);
+  margin: 0;
+  user-select: none;
+}
+.sb-mascot-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+
+/* ── Mascot eyes ─────────────────────────────────────────────────────────── */
+.sb-mascot-eye { transition: color 0.3s; }
+
+@keyframes sb-eye-pulse {
+  0%,100% { opacity: 0.7; text-shadow: 0 0 4px rgba(220,80,80,0.4); }
+  50%     { opacity: 1;   text-shadow: 0 0 10px rgba(220,80,80,1); }
+}
+@keyframes sb-eye-fast {
+  0%,100% { opacity: 0.8; text-shadow: 0 0 6px rgba(255,50,50,0.8); }
+  50%     { opacity: 1;   text-shadow: 0 0 14px rgba(255,50,50,1); }
+}
+@keyframes sb-eye-adapt {
+  0%,100% { opacity: 0.8; text-shadow: 0 0 6px rgba(255,200,0,0.6); }
+  50%     { opacity: 1;   text-shadow: 0 0 12px rgba(255,200,0,1); }
+}
+
+.sb-eye-idle   { color: rgba(220,80,80,0.9);  animation: sb-eye-pulse 2s ease-in-out infinite; }
+.sb-eye-detect { color: rgba(255,50,50,1);     animation: sb-eye-fast  0.3s ease-in-out infinite; }
+.sb-eye-adapt  { color: rgba(255,200,0,0.9);  animation: sb-eye-adapt 0.5s ease-in-out infinite; }
+.sb-eye-win    { color: rgba(80,200,120,0.9); animation: sb-eye-pulse 1s ease-in-out infinite; }
+
+/* ── Glitch animation ────────────────────────────────────────────────────── */
+@keyframes sb-glitch {
+  0%,100% { transform: translate(0,0); }
+  20%  { transform: translate(-3px, 1px); }
+  40%  { transform: translate(3px,-1px); }
+  60%  { transform: translate(-2px, 2px); }
+  80%  { transform: translate(2px,-2px); }
+}
+.sb-glitch { animation: sb-glitch 0.4s ease both; }
+
+/* ── Scanline sweep ──────────────────────────────────────────────────────── */
+@keyframes sb-scanline-sweep {
+  0%   { top: -2px; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.sb-scanline {
+  position: fixed;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(220,80,80,0.5),
+    rgba(220,80,80,1),
+    rgba(220,80,80,0.5),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 100;
+  animation: sb-scanline-sweep 1.5s ease-in-out forwards;
+}
+
+/* ── Matrix rain column ──────────────────────────────────────────────────── */
+@keyframes sb-matrix-drop {
+  0%   { transform: translateY(-100%); opacity: 1; }
+  80%  { opacity: 0.8; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+.sb-matrix-col {
+  position: fixed;
+  top: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: rgba(220,80,80,0.45);
+  pointer-events: none;
+  z-index: 50;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  animation: sb-matrix-drop var(--dur, 2s) linear var(--delay, 0s) forwards;
+}
+
+/* ── Adaptation box ──────────────────────────────────────────────────────── */
+.sb-adapt-box {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  padding: 10px 14px;
+  margin: 6px 0;
+  background: rgba(220,80,80,0.05);
+  border: 1px solid rgba(220,80,80,0.3);
+  border-radius: 4px;
+  white-space: pre;
+}
+.sb-adapt-border { color: rgba(255,200,0,0.8); }
+.sb-adapt-title  { color: rgba(255,200,0,0.9); font-weight: 600; }
+.sb-adapt-line   { color: rgba(255,255,255,0.55); }
+
+/* ── Screen flash ────────────────────────────────────────────────────────── */
+@keyframes sb-fadeOut { to { opacity: 0; } }

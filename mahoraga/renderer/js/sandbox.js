@@ -84,6 +84,30 @@ const TARGETS = [
   },
 ];
 
+// ── Session timer ─────────────────────────────────────────────────────────────
+
+let _sessionStart = null;
+let _timerInterval = null;
+
+function _startTimer() {
+  if (_timerInterval) return;
+  _sessionStart = Date.now();
+  _timerInterval = setInterval(() => {
+    const el = document.getElementById('sb-session-timer');
+    if (!el) return;
+    const s = Math.floor((Date.now() - _sessionStart) / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    el.textContent = [h, m, sec].map(n => String(n).padStart(2, '0')).join(':');
+  }, 1000);
+}
+
+function _formatElapsed() {
+  if (!_sessionStart) return '00:00:00';
+  const s = Math.floor((Date.now() - _sessionStart) / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return [h, m, sec].map(n => String(n).padStart(2, '0')).join(':');
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 let state = {
@@ -103,7 +127,32 @@ let _progressInterval = null;
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 function sbInit() {
-  window.mahoraga.onEvent(handlePythonEvent);
+  Bus.init();
+  Bus.on('SANDBOX_MODULES',         d => handlePythonEvent({ type: 'SANDBOX_MODULES', data: d }));
+  Bus.on('SANDBOX_ATTACK_STARTED',  d => handlePythonEvent({ type: 'SANDBOX_ATTACK_STARTED', data: d }));
+  Bus.on('SANDBOX_TERMINAL_LINE',   d => handlePythonEvent({ type: 'SANDBOX_TERMINAL_LINE', data: d }));
+  Bus.on('SANDBOX_DETECTION',       d => handlePythonEvent({ type: 'SANDBOX_DETECTION', data: d }));
+  Bus.on('SANDBOX_ATTACK_COMPLETE', d => handlePythonEvent({ type: 'SANDBOX_ATTACK_COMPLETE', data: d }));
+  Bus.on('SANDBOX_SESSION_RESET',   d => handlePythonEvent({ type: 'SANDBOX_SESSION_RESET', data: d }));
+  Bus.on('SANDBOX_ERROR',           d => handlePythonEvent({ type: 'SANDBOX_ERROR', data: d }));
+  Bus.on('OFFENSE_PREVIEW_DATA',    d => handlePythonEvent({ type: 'OFFENSE_PREVIEW_DATA', data: d }));
+  // Bus events for cross-page sync effects
+  Bus.on('THREAT_DETECTED',    d => {
+    if (state.running && window.SandboxEffects) {
+      SandboxEffects.scanline();
+      SandboxEffects.matrixRain(6);
+      SandboxEffects.setEyeState('detect');
+      SandboxEffects.glitchMascot();
+      SandboxEffects.flashScreen();
+    }
+  });
+  Bus.on('THREAT_NEUTRALISED', d => {
+    if (state.running && window.SandboxEffects) {
+      SandboxEffects.setEyeState('adapt');
+      SandboxEffects.adaptationBox(d.attack_type || 'unknown');
+      setTimeout(() => SandboxEffects.setEyeState('idle'), 4000);
+    }
+  });
 
   // ── Event delegation — no inline onclick anywhere ─────────────────────────
 
@@ -144,6 +193,7 @@ function sbInit() {
   renderModules();
   renderLog();
   sbInitTerminalInput();
+  if (window.SandboxEffects) SandboxEffects.setEyeState('idle');
 }
 
 // ── Python event router ───────────────────────────────────────────────────────
@@ -486,7 +536,9 @@ function _doLaunch(moduleId) {
   if (!mod) return;
 
   state.running = true;
+  _startTimer();
   renderModules();
+  if (window.SandboxEffects) SandboxEffects.setEyeState('detect');
   sbTerminalPrint([['dim', ''], ['red', `> Launching: ${mod.name}`]]);
   window.mahoraga.send('SANDBOX_LAUNCH', { module_id: moduleId, target_id: state.selectedTarget });
 }

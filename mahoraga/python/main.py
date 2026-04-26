@@ -39,6 +39,7 @@ from python.analysis.insight_generator import generate as generate_insights, OFF
 from python.sandbox.simulator import AttackSimulator
 from python.sandbox.attack_modules import TARGET_MODULES, MODULES_BY_ID
 from python.archive.strategy_generator import StrategyGenerator
+from python.analysis.offense_archiver import OffenseArchiver
 
 logger = get_logger('main')
 
@@ -64,6 +65,7 @@ class CommandRouter:
             'ACTIVATE_LICENSE':    self.app.activate_license,
             'GET_OFFENSIVE_INTEL': self.app.get_offensive_intel,
             'GET_OFFENSIVE_STRATEGIES': self.app.get_offensive_strategies,
+            'GET_OFFENSE':        self.app.get_offense,
             'GET_OFFENSE_PREVIEW': self.app.get_offense_preview,
             'SANDBOX_GET_STATE':  self.app.sandbox_get_state,
             'SANDBOX_ADAPT_NOW':  self.app.sandbox_adapt_now,
@@ -105,6 +107,7 @@ class MahoragaApp:
         self.demo_simulator = ThreatSimulator(self.on_telemetry)
         self.attack_simulator = AttackSimulator(self.on_telemetry)
         self.strategy_generator = StrategyGenerator(self.db)
+        self.offense_archiver = OffenseArchiver(self.db)
         self.adaptation_engine = AdaptationEngine(
             self.db, self.antibody_store, self.strategy_generator
         )
@@ -366,6 +369,13 @@ class MahoragaApp:
             'severity':    severity,
         })
 
+        # Save offense tactic (non-blocking)
+        threading.Thread(
+            target=self.offense_archiver.save_tactic,
+            args=(threat, antibody),
+            daemon=True
+        ).start()
+
         # ── LAYER 6: INSIGHT (non-blocking) ──────────────────────────────────
         def _run_insights():
             try:
@@ -444,6 +454,10 @@ class MahoragaApp:
     def get_archive_stats(self, payload=None):
         stats = self.antibody_store.get_stats()
         emit('ARCHIVE_STATS', stats)
+
+    def get_offense(self, payload=None):
+        tactics = self.offense_archiver.query()
+        emit('OFFENSE_DATA', {'tactics': tactics, 'count': len(tactics)})
 
     def sandbox_get_modules(self, payload: dict):
         target_id = payload.get('target_id', '')

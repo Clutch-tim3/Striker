@@ -107,6 +107,7 @@
             <span id="sb-score">0</span>
             <span style="color:var(--text-3);font-weight:400"> pts</span>
           </div>
+          <div class="sb-timer-pill" id="sb-session-timer">00:00:00</div>
           <button class="btn btn-secondary btn-sm" id="btn-reset">Reset Session</button>
         </div>
       </div>
@@ -114,8 +115,23 @@
       <!-- Main sandbox grid -->
       <div class="sb-grid">
 
-        <!-- ── LEFT: Target + attack selector ─────────────── -->
+        <!-- ── LEFT: Mascot + Target + attack selector ───────── -->
         <div class="sb-left">
+
+          <!-- Mascot -->
+          <div class="sb-mascot" id="sb-mascot-face">
+            <pre class="sb-mascot-art">╔═══════════╗
+║           ║
+║  <span class="sb-mascot-eye sb-eye-idle">◈</span>     <span class="sb-mascot-eye sb-eye-idle">◈</span>  ║
+║     ▼     ║
+║   ╔═══╗   ║
+║   ╚═══╝   ║
+╚═══════════╝</pre>
+            <div class="sb-mascot-status">
+              <div class="live-dot" style="width:6px;height:6px;border-radius:50%;background:rgba(80,200,120,0.8);animation:pulse 2s ease-in-out infinite"></div>
+              <span>STRIKER ACTIVE</span>
+            </div>
+          </div>
 
           <!-- Target picker -->
           <div class="sb-section-label">SELECT TARGET</div>
@@ -215,6 +231,9 @@
 </div>
 
 <script src="js/ipc.js"></script>
+<script src="js/bus.js"></script>
+<script src="js/sandbox-effects.js"></script>
+<script src="js/ctf-animation.js"></script>
 <script src="js/sandbox.js"></script>
 </body>
 </html>

@@ -1,8 +1,8 @@
 'use strict';
 
-let _allStrategies = [];
+let _allTactics = [];
 let _currentFilter = 'all';
-let _currentStrategy = null;
+let _currentTactic = null;
 
 const ATTACK_LABELS = {
   ransomware: 'Ransomware', keylogger: 'Keylogger', rootkit: 'Rootkit',
@@ -23,215 +23,203 @@ const ATTACK_ICONS = {
   ld_preload_injection: '💉', kernel_module_load: '⚙️',
 };
 
-// attack type → sandbox module id (for Simulate button)
-const SANDBOX_MODULE_MAP = {
-  ransomware:           'ransomware_sim',
-  c2_beacon:            'c2_beacon_sim',
-  keylogger:            'keylogger_sim',
-  privilege_escalation: 'privesc_sim',
-  data_exfil:           'data_exfil_sim',
-  rootkit:              'rootkit_sim',
-  backdoor:             'lolbin_sim',
-  cryptominer:          'cryptominer_sim',
-};
+function _sevColour(sev) {
+  if (sev >= 8) return '#dc2020';
+  if (sev >= 5) return '#d97706';
+  if (sev >= 3) return '#0284c7';
+  return '#6b7280';
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 function offInit() {
-  window.mahoraga.onEvent(handleEvent);
+  Bus.init();
 
-  // Event delegation — no JSON in onclick attributes
-  document.getElementById('off-strategy-grid').addEventListener('click', e => {
-    const card = e.target.closest('[data-strategy-id]');
-    if (card) offShowStrategyModal(card.dataset.strategyId);
+  Bus.on('OFFENSE_DATA', d => {
+    _allTactics = d.tactics || [];
+    _updateCount(_allTactics.length);
+    _buildFilterTabs(_allTactics);
+    offFilter();
   });
 
-  offLoadStrategies();
-  setInterval(offLoadStrategies, 5000);
-}
-
-function handleEvent(e) {
-  if (e.type === 'OFFENSIVE_STRATEGIES_DATA') {
-    _allStrategies = e.data.strategies || [];
-    _updateHeaderStats(_allStrategies.length, e.data.current_cycle);
-    _populateFilterTabs(_allStrategies);
+  Bus.on('OFFENSE_SAVED', d => {
+    _allTactics.unshift(d);
+    _updateCount(_allTactics.length);
+    _buildFilterTabs(_allTactics);
     offFilter();
-  }
-  if (e.type === 'OFFENSIVE_STRATEGY_CREATED') {
-    _allStrategies.unshift(e.data);
-    _updateHeaderStats(_allStrategies.length);
-    _populateFilterTabs(_allStrategies);
+    _toast(`New tactic: ${ATTACK_LABELS[d.attack_type] || d.attack_type}`);
+  });
+
+  // Event delegation for tactic grid
+  document.getElementById('off-tactic-grid').addEventListener('click', e => {
+    const copyBtn = e.target.closest('[data-copy-cmd]');
+    if (copyBtn) { e.stopPropagation(); _copyCmd(copyBtn.dataset.copyCmd, copyBtn); return; }
+    const runBtn = e.target.closest('[data-run-tactic]');
+    if (runBtn) { e.stopPropagation(); window.location.href = 'sandbox.html?tactic=' + runBtn.dataset.runTactic; return; }
+    const card = e.target.closest('[data-tactic-id]');
+    if (card) offShowModal(card.dataset.tacticId);
+  });
+
+  // Filter tabs (event delegation)
+  document.getElementById('off-filter-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('[data-filter]');
+    if (!btn) return;
+    _currentFilter = btn.dataset.filter;
+    document.querySelectorAll('.off-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
     offFilter();
-    _showToast(`New intel: ${e.data.name}`);
-  }
+  });
+
+  document.getElementById('off-search').addEventListener('input', offFilter);
+
+  // Modal copy buttons (event delegation)
+  document.getElementById('off-modal').addEventListener('click', e => {
+    const copyBtn = e.target.closest('[data-copy-cmd]');
+    if (copyBtn) { e.stopPropagation(); _copyCmd(copyBtn.dataset.copyCmd, copyBtn); }
+  });
+
+  window.mahoraga.send('GET_OFFENSE', {});
 }
 
-// ── Header stats ──────────────────────────────────────────────────────────────
+// ── Count + filter tabs ───────────────────────────────────────────────────────
 
-function _updateHeaderStats(count, cycle) {
-  document.getElementById('off-stat-strategies').textContent = count;
-  if (cycle !== undefined) {
-    const el = document.getElementById('off-stat-cycle');
-    if (el) el.textContent = cycle;
-  }
+function _updateCount(n) {
+  const el = document.getElementById('off-stat-count');
+  if (el) el.textContent = n;
 }
 
-// ── Filter tabs ───────────────────────────────────────────────────────────────
-
-function _populateFilterTabs(strategies) {
+function _buildFilterTabs(tactics) {
+  const types = new Set(tactics.map(t => t.attack_type).filter(Boolean));
   const tabs = document.getElementById('off-filter-tabs');
-  const types = new Set();
-  strategies.forEach(s =>
-    (s.attack_types || '').split(',').forEach(t => { t = t.trim(); if (t) types.add(t); })
-  );
-
-  tabs.innerHTML =
-    `<button class="off-tab${_currentFilter === 'all' ? ' active' : ''}" onclick="offSetFilter('all',this)">All</button>`;
+  tabs.innerHTML = `<button class="off-tab${_currentFilter === 'all' ? ' active' : ''}" data-filter="all">All</button>`;
   types.forEach(type => {
-    const label = ATTACK_LABELS[type] || type.replace(/_/g, ' ');
+    const label  = ATTACK_LABELS[type] || type.replace(/_/g, ' ');
     const active = _currentFilter === type ? ' active' : '';
     tabs.insertAdjacentHTML('beforeend',
-      `<button class="off-tab${active}" onclick="offSetFilter('${type}',this)">${label}</button>`);
+      `<button class="off-tab${active}" data-filter="${type}">${label}</button>`);
   });
 }
 
-function offSetFilter(f, btn) {
-  _currentFilter = f;
-  document.querySelectorAll('.off-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  offFilter();
-}
-
-// ── Load & render ─────────────────────────────────────────────────────────────
-
-function offLoadStrategies() {
-  window.mahoraga.send('GET_OFFENSIVE_STRATEGIES', {});
-}
+// ── Filter ────────────────────────────────────────────────────────────────────
 
 function offFilter() {
   const search = (document.getElementById('off-search').value || '').toLowerCase();
-
-  const visible = _allStrategies.filter(s => {
-    if (_currentFilter !== 'all') {
-      const types = (s.attack_types || '').split(',').map(t => t.trim());
-      if (!types.includes(_currentFilter)) return false;
-    }
+  const visible = _allTactics.filter(t => {
+    if (_currentFilter !== 'all' && t.attack_type !== _currentFilter) return false;
     if (search) {
-      return (s.name || '').toLowerCase().includes(search) ||
-             (s.description || '').toLowerCase().includes(search) ||
-             (s.attack_types || '').toLowerCase().includes(search);
+      return (t.attack_type || '').includes(search) ||
+             (t.description || '').toLowerCase().includes(search) ||
+             (t.technique || '').toLowerCase().includes(search);
     }
     return true;
   });
 
-  const grid = document.getElementById('off-strategy-grid');
+  const grid = document.getElementById('off-tactic-grid');
   const loading = document.getElementById('off-loading');
   if (loading) loading.style.display = 'none';
 
-  grid.innerHTML = visible.length
-    ? visible.map(_buildStrategyCard).join('')
-    : '<div class="off-empty">No strategies match your filter.</div>';
+  if (!visible.length) {
+    grid.innerHTML = _allTactics.length === 0
+      ? `<div class="off-empty-state">
+           <div class="off-empty-icon">🔬</div>
+           <div class="off-empty-title">No tactics archived yet.</div>
+           <div class="off-empty-sub">Run sandbox attacks to generate your first entries.</div>
+           <a href="sandbox.html" class="btn btn-sm" style="background:var(--black);color:#fff;margin-top:14px;text-decoration:none;display:inline-block;padding:8px 18px;border-radius:var(--radius)">Open Sandbox →</a>
+         </div>`
+      : `<div class="off-empty">No tactics match your filter.</div>`;
+    return;
+  }
+
+  grid.innerHTML = visible.map(_buildCard).join('');
 }
 
-function _buildStrategyCard(s) {
-  const name = s.name || 'Unnamed Strategy';
-  const desc = s.description || '';
-  const attackTypes = (s.attack_types || '').split(',').map(t => t.trim()).filter(Boolean);
-  const createdAt = s.created_at ? new Date(s.created_at).toLocaleDateString() : '—';
-  const version = s.adaptation_version || 0;
-  const primaryIcon = attackTypes[0] ? (ATTACK_ICONS[attackTypes[0]] || '⚔️') : '⚔️';
+// ── Card builder ──────────────────────────────────────────────────────────────
 
-  const tags = attackTypes.slice(0, 3).map(at =>
-    `<span class="mitre-tag">${ATTACK_ICONS[at] || ''} ${ATTACK_LABELS[at] || at}</span>`
-  ).join('');
-  const extra = attackTypes.length > 3
-    ? `<span class="mitre-tag">+${attackTypes.length - 3} more</span>` : '';
+function _buildCard(t) {
+  const icon     = ATTACK_ICONS[t.attack_type] || '⚔️';
+  const label    = ATTACK_LABELS[t.attack_type] || t.attack_type;
+  const sev      = t.severity || 0;
+  const sevCol   = _sevColour(sev);
+  const date     = t.created_at ? new Date(t.created_at).toLocaleDateString() : '—';
+  const commands = Array.isArray(t.commands) ? t.commands : [];
+  const firstCmd = commands[0] || '';
 
   return `
-    <div class="strategy-card" data-strategy-id="${s.id}">
-      <div class="strategy-card-top">
-        <div class="strategy-card-icon">${primaryIcon}</div>
-        <div style="flex:1;min-width:0">
-          <div class="strategy-card-title">${name}</div>
-          <div class="strategy-card-meta">${createdAt} · ${attackTypes.length} technique${attackTypes.length !== 1 ? 's' : ''}</div>
+    <div class="off-tactic-card" data-tactic-id="${_esc(t.id)}" style="border-left-color:${sevCol}">
+      <div class="off-tc-header">
+        <div class="off-tc-left">
+          <span class="off-tc-icon">${icon}</span>
+          <div>
+            <div class="off-tc-name">${label}</div>
+            <div class="off-tc-meta">
+              ${t.mitre_id ? `<span class="mitre-tag">${t.mitre_id}</span>` : ''}
+              <span class="off-sev-badge" style="background:${sevCol}20;color:${sevCol};border:1px solid ${sevCol}40">SEV ${sev}</span>
+            </div>
+          </div>
         </div>
-        <div class="off-version-badge">v${version}</div>
+        <span class="off-tc-date">${date}</span>
       </div>
-      ${desc ? `<div class="strategy-card-desc">${desc}</div>` : ''}
-      ${tags ? `<div class="strategy-card-tags">${tags}${extra}</div>` : ''}
-      <div class="strategy-card-cta">View intelligence →</div>
+      ${t.description ? `<div class="off-tc-desc">${_escHtml(t.description)}</div>` : ''}
+      ${firstCmd ? `
+      <div class="off-tc-cmd-preview">
+        <div class="off-cmd-label">COMMANDS</div>
+        <div class="off-cmd-block">
+          <code class="off-cmd-code">${_escHtml(firstCmd)}</code>
+          <button class="off-copy-btn" data-copy-cmd="${_escAttr(firstCmd)}">Copy</button>
+        </div>
+        ${commands.length > 1 ? `<div class="off-cmd-more">+${commands.length - 1} more — click card for all</div>` : ''}
+      </div>` : ''}
+      <div class="off-tc-actions">
+        <button class="off-run-btn" data-run-tactic="${_esc(t.id)}">▶ Run in Sandbox</button>
+        <span class="off-tc-cta">View all commands →</span>
+      </div>
     </div>`;
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
-function offShowStrategyModal(id) {
-  const s = _allStrategies.find(x => x.id === id);
-  if (!s) return;
-  _currentStrategy = s;
+function offShowModal(id) {
+  const t = _allTactics.find(x => x.id === id);
+  if (!t) return;
+  _currentTactic = t;
 
-  const attackTypes = (s.attack_types || '').split(',').map(t => t.trim()).filter(Boolean);
-  const created = s.created_at ? new Date(s.created_at).toLocaleDateString() : '—';
+  const icon     = ATTACK_ICONS[t.attack_type] || '⚔️';
+  const label    = ATTACK_LABELS[t.attack_type] || t.attack_type;
+  const sev      = t.severity || 0;
+  const sevCol   = _sevColour(sev);
+  const commands = Array.isArray(t.commands) ? t.commands : [];
+  const date     = t.created_at ? new Date(t.created_at).toLocaleString() : '—';
 
-  document.getElementById('off-modal-status').textContent = '⚔ OFFENSIVE INTEL';
-  document.getElementById('off-modal-title').textContent = s.name || 'Unnamed Strategy';
+  document.getElementById('off-modal-title').textContent = `${icon} ${label}`;
+  document.getElementById('off-modal-status').textContent =
+    `⚔ OFFENSE TACTIC${t.mitre_id ? ' · ' + t.mitre_id : ''}`;
 
   document.getElementById('off-modal-stats').innerHTML = `
     <div class="off-ms-row">
       <div class="off-ms-stat">
-        <div class="off-ms-val">${attackTypes.length}</div>
-        <div class="off-ms-lbl">Techniques</div>
+        <div class="off-ms-val" style="color:${sevCol}">${sev}/10</div>
+        <div class="off-ms-lbl">Severity</div>
       </div>
       <div class="off-ms-stat">
-        <div class="off-ms-val">${created}</div>
+        <div class="off-ms-val">${commands.length}</div>
+        <div class="off-ms-lbl">Commands</div>
+      </div>
+      <div class="off-ms-stat">
+        <div class="off-ms-val">${date.split(',')[0]}</div>
         <div class="off-ms-lbl">Catalogued</div>
-      </div>
-      <div class="off-ms-stat">
-        <div class="off-ms-val">v${s.adaptation_version || 0}</div>
-        <div class="off-ms-lbl">Adaptation</div>
       </div>
     </div>`;
 
   document.getElementById('off-modal-details').textContent =
-    s.description || 'No description provided.';
+    t.description || 'No description provided.';
 
-  // Offensive context — one block per attack type
-  const offEl = document.getElementById('off-modal-offensive');
-  offEl.innerHTML = attackTypes.length
-    ? attackTypes.map(at => {
-        const label = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
-        const icon  = ATTACK_ICONS[at] || '⚠️';
-        const ctx   = (s.offensive_contexts && s.offensive_contexts[at])
-                      || 'No offensive context available for this technique.';
-        const canSim = !!SANDBOX_MODULE_MAP[at];
-        return `
-          <div class="off-technique-block">
-            <div class="off-technique-header">
-              <span class="off-technique-icon">${icon}</span>
-              <span class="off-technique-label">${label}</span>
-              ${canSim ? `<button class="off-simulate-btn" onclick="offSimulateAttackType('${at}')">⚗ Simulate</button>` : ''}
-            </div>
-            <div class="off-modal-body">${ctx}</div>
-          </div>`;
-      }).join('')
-    : '<p style="color:var(--text-3);font-size:13px">No attack types associated with this strategy.</p>';
-
-  // Defensive playbook — one block per attack type
-  const defEl = document.getElementById('off-modal-defensive');
-  defEl.innerHTML = attackTypes.length
-    ? attackTypes.map(at => {
-        const label    = ATTACK_LABELS[at] || at.replace(/_/g, ' ');
-        const playbook = (s.defensive_playbooks && s.defensive_playbooks[at])
-                         || 'No defensive playbook entry available.';
-        return `
-          <div class="off-technique-block">
-            <div class="off-technique-header">
-              <span class="off-technique-label">${label}</span>
-            </div>
-            <div class="off-modal-body" style="border-left-color:var(--border-dark)">${playbook}</div>
-          </div>`;
-      }).join('')
-    : '<p style="color:var(--text-3);font-size:13px">No defensive guidance available.</p>';
+  document.getElementById('off-modal-commands').innerHTML = commands.length
+    ? commands.map(cmd => `
+        <div class="off-modal-cmd-block">
+          <code class="off-modal-cmd-code">${_escHtml(cmd)}</code>
+          <button class="off-copy-btn" data-copy-cmd="${_escAttr(cmd)}">Copy</button>
+        </div>`).join('')
+    : '<p style="color:var(--text-3);font-size:13px">No commands available.</p>';
 
   document.getElementById('off-modal').style.display = 'flex';
 }
@@ -239,46 +227,55 @@ function offShowStrategyModal(id) {
 function offCloseModal(e) {
   if (e && e.target !== document.getElementById('off-modal')) return;
   document.getElementById('off-modal').style.display = 'none';
-  _currentStrategy = null;
+  _currentTactic = null;
 }
 
-// ── Offensive actions ─────────────────────────────────────────────────────────
+// ── Actions ───────────────────────────────────────────────────────────────────
 
-function offSimulateAttackType(attackType) {
-  const label = ATTACK_LABELS[attackType] || attackType;
-  _showToast(`Opening Sandbox — select the ${label} module to run this attack pattern`);
-  setTimeout(() => { window.location.href = 'sandbox.html'; }, 1400);
+function offCopyAll() {
+  const t = _currentTactic;
+  if (!t) return;
+  const commands = Array.isArray(t.commands) ? t.commands : [];
+  const label    = ATTACK_LABELS[t.attack_type] || t.attack_type;
+  const text = `# ${label} — Offense Tactic\n# MITRE: ${t.mitre_id || '—'} · Severity: ${t.severity}\n\n` +
+               commands.join('\n\n');
+  navigator.clipboard.writeText(text)
+    .then(() => _toast('All commands copied'))
+    .catch(() => _toast('Copy failed'));
 }
 
-function offCopyTactics() {
-  const s = _currentStrategy;
-  if (!s) return;
-  const attackTypes = (s.attack_types || '').split(',').map(t => t.trim()).filter(Boolean);
-  const divider = '─'.repeat(56);
-  let text = `OFFENSIVE INTELLIGENCE REPORT\n${divider}\n${s.name}\n${divider}\n\n${s.description || ''}\n\nAdaptation: v${s.adaptation_version || 0}\n\n`;
-  for (const at of attackTypes) {
-    const label = ATTACK_LABELS[at] || at;
-    const ctx   = s.offensive_contexts && s.offensive_contexts[at];
-    if (ctx) text += `[ ${label.toUpperCase()} ]\n${ctx}\n\n`;
-  }
-  navigator.clipboard.writeText(text.trim())
-    .then(() => _showToast('Tactics copied to clipboard'))
-    .catch(() => _showToast('Copy failed'));
+function offRunInSandbox() {
+  const t = _currentTactic;
+  if (t) window.location.href = `sandbox.html?tactic=${t.id}`;
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function _showToast(msg) {
+function _copyCmd(cmd, btn) {
+  navigator.clipboard.writeText(cmd).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied ✓';
+    btn.style.color = 'rgba(80,200,120,0.9)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1800);
+  }).catch(() => _toast('Copy failed'));
+}
+
+function _toast(msg) {
   document.querySelectorAll('.off-toast').forEach(t => t.remove());
   const el = document.createElement('div');
   el.className = 'off-toast';
   el.textContent = msg;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add('off-toast-visible'));
-  setTimeout(() => {
-    el.classList.remove('off-toast-visible');
-    setTimeout(() => el.remove(), 300);
-  }, 3000);
+  setTimeout(() => { el.classList.remove('off-toast-visible'); setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+function _esc(s) { return String(s || '').replace(/"/g, '&quot;'); }
+function _escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function _escAttr(s) {
+  return String(s || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 document.addEventListener('DOMContentLoaded', offInit);

@@ -61,7 +61,12 @@ function tryParseJSON(str) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 function init() {
-  window.mahoraga.onEvent(handleEvent);
+  Bus.init();
+  Bus.on('ARCHIVE_DATA',    d => handleEvent({ type: 'ARCHIVE_DATA', data: d }));
+  Bus.on('ARCHIVE_UPDATED', d => handleEvent({ type: 'ARCHIVE_UPDATED', data: d }));
+  Bus.on('ARCHIVE_ERROR',   d => handleEvent({ type: 'ARCHIVE_ERROR', data: d }));
+  Bus.on('THREAT_NEUTRALISED', d => handleEvent({ type: 'THREAT_NEUTRALISED', data: d }));
+  Bus.on('OFFENSIVE_STRATEGY_CREATED', d => handleEvent({ type: 'OFFENSIVE_STRATEGY_CREATED', data: d }));
   populateFilterDropdown();
 
   // Event delegation — no JSON in onclick attributes

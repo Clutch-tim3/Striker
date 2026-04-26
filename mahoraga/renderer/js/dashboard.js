@@ -10,7 +10,16 @@ function init() {
   renderActivityChart('activity-chart', activityData);
   renderAdaptationArc(adaptationScore);
 
-  window.mahoraga.onEvent(handleEvent);
+  Bus.init();
+  Bus.on('MONITORING_STARTED', d => handleEvent({ type: 'MONITORING_STARTED', data: d }));
+  Bus.on('MONITORING_STOPPED', d => handleEvent({ type: 'MONITORING_STOPPED', data: d }));
+  Bus.on('THREAT_DETECTED',    d => handleEvent({ type: 'THREAT_DETECTED', data: d }));
+  Bus.on('THREAT_NEUTRALISED', d => handleEvent({ type: 'THREAT_NEUTRALISED', data: d }));
+  Bus.on('ARCHIVE_STATS',      d => handleEvent({ type: 'ARCHIVE_STATS', data: d }));
+  Bus.on('ARCHIVE_UPDATED',    d => handleEvent({ type: 'ARCHIVE_UPDATED', data: d }));
+  Bus.on('THREAT_ANALYSIS_READY', d => handleEvent({ type: 'THREAT_ANALYSIS_READY', data: d }));
+  Bus.on('CONFIG_DATA',        d => handleEvent({ type: 'CONFIG_DATA', data: d }));
+
   window.mahoraga.send('GET_CONFIG');
   window.mahoraga.send('GET_ARCHIVE_STATS', {});
 }
