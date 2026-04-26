@@ -4,7 +4,8 @@ import os
 from python.core.logger import get_logger
 
 logger = get_logger('behaviour_classifier')
-MODEL_PATH = os.path.join(os.path.dirname(__file__), '../../models/behaviour_classifier.pkl')
+MODEL_PATH = os.path.expanduser('~/.mahoraga/models/behaviour_classifier.pkl')
+_LEGACY_PATH = os.path.join(os.path.dirname(__file__), '../../models/behaviour_classifier.pkl')
 
 ATTACK_FAMILIES = [
     'benign', 'ransomware', 'keylogger', 'rootkit',
@@ -18,12 +19,13 @@ class BehaviourClassifier:
         self.model = self._load_or_create()
 
     def _load_or_create(self):
-        if os.path.exists(MODEL_PATH):
-            try:
-                with open(MODEL_PATH, 'rb') as f:
-                    return pickle.load(f)
-            except Exception:
-                pass
+        for path in [MODEL_PATH, _LEGACY_PATH]:
+            if os.path.exists(path):
+                try:
+                    with open(path, 'rb') as f:
+                        return pickle.load(f)
+                except Exception:
+                    pass
         from sklearn.ensemble import RandomForestClassifier
         return RandomForestClassifier(n_estimators=100, random_state=42)
 
@@ -71,6 +73,6 @@ class BehaviourClassifier:
             os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
             with open(MODEL_PATH, 'wb') as f:
                 pickle.dump(self.model, f)
-            logger.info('Behaviour classifier retrained')
+            logger.info(f'Behaviour classifier retrained on {len(X)} samples')
         except Exception as e:
             logger.error(f'Behaviour retrain failed: {e}')
